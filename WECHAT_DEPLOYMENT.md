@@ -10,12 +10,13 @@ in the mini program console.
 Required environment variables:
 
 ```text
-GEMINI_API_KEY=...
-GEMINI_API_BASE=https://generativelanguage.googleapis.com/v1beta
-IMAGE_PROVIDER=gemini
-ANALYSIS_PROVIDER=gemini
-GEMINI_IMAGE_MODEL=gemini-3-pro-image-preview
-ANALYSIS_MODEL=gemini-2.5-pro
+ARK_API_KEY=...
+ARK_API_BASE=https://ark.cn-beijing.volces.com/api/v3
+IMAGE_PROVIDER=seedream
+ANALYSIS_PROVIDER=ark
+ARK_IMAGE_MODEL=doubao-seedream-4-0-250828
+ARK_IMAGE_SIZE=2K
+ANALYSIS_MODEL=doubao-seed-2-0-pro-260215
 DAILY_HAIR_LIMIT=11
 HAIR_VARIANT_CONCURRENCY=1
 ```

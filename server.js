@@ -45,11 +45,11 @@ function loadJsonConfig(name) {
 const aestheticConfig = loadJsonConfig('aesthetic.config.json');
 
 const port = Number(process.env.PORT || 8000);
-const imageProvider = (process.env.IMAGE_PROVIDER || (process.env.GEMINI_API_KEY ? 'gemini' : 'openai')).toLowerCase();
+const imageProvider = (process.env.IMAGE_PROVIDER || (process.env.ARK_API_KEY ? 'seedream' : process.env.GEMINI_API_KEY ? 'gemini' : 'openai')).toLowerCase();
 const model = process.env.OPENAI_IMAGE_MODEL || 'gpt-image-1.5';
 const geminiModel = process.env.GEMINI_IMAGE_MODEL || 'gemini-3-pro-image-preview';
-const analysisProvider = (process.env.ANALYSIS_PROVIDER || (process.env.GEMINI_API_KEY ? 'gemini' : process.env.OPENAI_API_KEY ? 'openai' : 'local')).toLowerCase();
-const analysisModel = process.env.ANALYSIS_MODEL || (analysisProvider === 'gemini' ? 'gemini-2.5-pro' : 'gpt-4.1-mini');
+const analysisProvider = (process.env.ANALYSIS_PROVIDER || (process.env.ARK_API_KEY ? 'ark' : process.env.GEMINI_API_KEY ? 'gemini' : process.env.OPENAI_API_KEY ? 'openai' : 'local')).toLowerCase();
+const analysisModel = process.env.ANALYSIS_MODEL || (analysisProvider === 'gemini' ? 'gemini-2.5-pro' : analysisProvider === 'ark' ? 'doubao-seed-2-0-pro-260215' : 'gpt-4.1-mini');
 const aestheticAnalysisProvider = (process.env.AESTHETIC_ANALYSIS_PROVIDER || aestheticConfig.analysisProvider || analysisProvider).toLowerCase();
 const aestheticAnalysisModel = process.env.AESTHETIC_ANALYSIS_MODEL || aestheticConfig.analysisModel || (aestheticAnalysisProvider === 'gemini' ? 'gemini-2.5-pro' : analysisModel);
 const aestheticImageProvider = (process.env.AESTHETIC_IMAGE_PROVIDER || aestheticConfig.imageProvider || 'gemini').toLowerCase();
@@ -60,6 +60,8 @@ const agnesModel = process.env.AGNES_IMAGE_MODEL || 'agnes-image-1.2';
 const liblibModel = process.env.LIBLIB_IMAGE_MODEL || 'star-3-alpha';
 const apiBase = process.env.OPENAI_API_BASE || 'https://api.openai.com/v1';
 const geminiApiBase = process.env.GEMINI_API_BASE || 'https://generativelanguage.googleapis.com/v1beta';
+const arkApiBase = process.env.ARK_API_BASE || 'https://ark.cn-beijing.volces.com/api/v3';
+const arkImageModel = process.env.ARK_IMAGE_MODEL || 'doubao-seedream-4-0-250828';
 const agnesApiBase = process.env.AGNES_API_BASE || 'https://apihub.agnes-ai.com/v1';
 const liblibApiBase = process.env.LIBLIB_API_BASE || 'https://openapi.liblibai.cloud';
 const variantLimit = Number(process.env.HAIR_VARIANT_LIMIT || (imageProvider === 'liblib' ? 5 : 15));
@@ -352,6 +354,12 @@ function dataUrlToBlob(dataUrl) {
   return new Blob([buffer], { type: mime });
 }
 
+function dataUrlToArkImageUrl(imageDataUrl) {
+  if (/^https?:\/\//i.test(imageDataUrl || '')) return imageDataUrl;
+  const input = parseDataUrl(imageDataUrl);
+  return `data:${input.mimeType};base64,${input.data}`;
+}
+
 function todayKey() {
   return new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Shanghai',
@@ -429,6 +437,9 @@ function portraitPrompt(style) {
 }
 
 async function createStyleVariant(imageDataUrl, style) {
+  if (imageProvider === 'seedream' || imageProvider === 'ark') {
+    return createSeedreamStyleVariant(imageDataUrl, style);
+  }
   if (imageProvider === 'liblib') {
     return createLiblibStyleVariant(imageDataUrl, style);
   }
@@ -615,6 +626,37 @@ async function createGeminiRecommendation(imageDataUrl, metrics, count = 5) {
   return JSON.parse(stripJsonFence(text));
 }
 
+async function createArkRecommendation(imageDataUrl, metrics, count = 5) {
+  if (!process.env.ARK_API_KEY) throw new Error('缺少 ARK_API_KEY。');
+  const imageUrl = dataUrlToArkImageUrl(imageDataUrl);
+  const response = await fetch(`${arkApiBase}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${process.env.ARK_API_KEY}`
+    },
+    body: JSON.stringify({
+      model: analysisModel,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'text', text: `${recommendationPrompt(metrics, count)}\n\n请只输出 JSON，不要输出 Markdown。` },
+          { type: 'image_url', image_url: { url: imageUrl } }
+        ]
+      }],
+      response_format: { type: 'json_object' },
+      temperature: 0.35
+    })
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.error?.message || payload.message || `火山方舟推荐失败：HTTP ${response.status}`);
+  }
+  const text = payload.choices?.[0]?.message?.content || payload.output_text || '';
+  if (!text) throw new Error('火山方舟推荐没有返回文本。');
+  return JSON.parse(stripJsonFence(text));
+}
+
 async function createOpenAiRecommendation(imageDataUrl, metrics, count = 5) {
   if (!process.env.OPENAI_API_KEY) throw new Error('缺少 OPENAI_API_KEY。');
   const input = parseDataUrl(imageDataUrl);
@@ -653,7 +695,9 @@ async function createHairRecommendation(imageDataUrl, metrics = {}, options = {}
   try {
     const aiPayload = analysisProvider === 'openai'
       ? await createOpenAiRecommendation(imageDataUrl, metrics, count)
-      : await createGeminiRecommendation(imageDataUrl, metrics, count);
+      : analysisProvider === 'ark'
+        ? await createArkRecommendation(imageDataUrl, metrics, count)
+        : await createGeminiRecommendation(imageDataUrl, metrics, count);
     return normalizeRecommendation({ ...aiPayload, provider: analysisProvider }, fallback, count);
   } catch (err) {
     return {
@@ -1268,6 +1312,49 @@ async function createAgnesStyleVariant(imageDataUrl, style) {
   };
 }
 
+async function createSeedreamStyleVariant(imageDataUrl, style) {
+  if (!process.env.ARK_API_KEY) {
+    throw new Error('缺少 ARK_API_KEY。请在云托管环境变量中配置火山方舟 API Key。');
+  }
+
+  const response = await fetch(`${arkApiBase}/images/generations`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${process.env.ARK_API_KEY}`
+    },
+    body: JSON.stringify({
+      model: arkImageModel,
+      prompt: portraitPrompt(style),
+      image: dataUrlToArkImageUrl(imageDataUrl),
+      size: process.env.ARK_IMAGE_SIZE || '2K',
+      response_format: 'url',
+      watermark: false,
+      sequential_image_generation: 'disabled'
+    })
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message = payload.error?.message || payload.message || `Seedream 图片生成失败：HTTP ${response.status}`;
+    throw new Error(`${style.label}: ${message}`);
+  }
+
+  const item = payload.data?.[0] || payload.result?.[0] || {};
+  const url = item.url || item.image_url;
+  const b64 = item.b64_json || item.image_base64;
+  if (b64) {
+    return { ...style, image: `data:image/png;base64,${b64}` };
+  }
+  if (!url) {
+    throw new Error(`${style.label}: Seedream 没有返回图片 URL。`);
+  }
+  return {
+    ...style,
+    image: await dataUrlFromRemoteImage(url)
+  };
+}
+
 async function createGeminiStyleVariant(imageDataUrl, style) {
   if (!process.env.GEMINI_API_KEY) {
     throw new Error('缺少 GEMINI_API_KEY。请在 .env 中配置 GEMINI_API_KEY 后重启 npm start。');
@@ -1340,6 +1427,9 @@ async function mapLimited(items, concurrency, worker) {
 }
 
 async function createHairVariants(imageDataUrl, options = {}) {
+  if ((imageProvider === 'seedream' || imageProvider === 'ark') && !process.env.ARK_API_KEY) {
+    throw new Error('缺少 ARK_API_KEY。请在云托管环境变量中配置火山方舟 API Key。');
+  }
   if (imageProvider === 'openai' && !process.env.OPENAI_API_KEY) {
     throw new Error('缺少 OPENAI_API_KEY。请在当前终端执行 export OPENAI_API_KEY=你的key，然后重启 npm start。');
   }
@@ -1401,7 +1491,10 @@ const server = createServer(async (req, res) => {
     if (req.method === 'POST' && req.url === '/api/hair-recommendation') {
       const body = await readBody(req);
       const payload = JSON.parse(body || '{}');
-      const image = await imageInputToDataUrl(payload.image || payload.imageUrl);
+      const inputImage = payload.image || payload.imageUrl;
+      const image = analysisProvider === 'ark' && /^https?:\/\//i.test(String(inputImage || ''))
+        ? inputImage
+        : await imageInputToDataUrl(inputImage);
       const result = await createHairRecommendation(image, payload.metrics || {}, { count: payload.count });
       json(res, 200, result);
       return;
@@ -1429,7 +1522,10 @@ const server = createServer(async (req, res) => {
       const user = sessionUser(req);
       const requested = Math.max(1, Math.min(15, Number(payload.limit || (payload.recommendations || []).length || tryOnLimit)));
       if (user) consumeQuota(user.openid, requested);
-      const image = await imageInputToDataUrl(payload.image || payload.imageUrl);
+      const inputImage = payload.image || payload.imageUrl;
+      const image = (imageProvider === 'seedream' || imageProvider === 'ark') && /^https?:\/\//i.test(String(inputImage || ''))
+        ? inputImage
+        : await imageInputToDataUrl(inputImage);
       const result = await createRecommendedTryOns(image, payload.recommendations || [], { limit: payload.limit });
       if (user) result.quota = quotaState(user.openid);
       json(res, 200, result);
@@ -1470,7 +1566,7 @@ server.listen(port, () => {
   console.log(`Image provider: ${imageProvider}`);
   console.log(`Analysis provider: ${analysisProvider}`);
   console.log(`Analysis model: ${analysisModel}`);
-  console.log(`Image model: ${imageProvider === 'liblib' ? liblibModel : imageProvider === 'agnes' ? agnesModel : imageProvider === 'gemini' ? geminiModel : model}`);
+  console.log(`Image model: ${imageProvider === 'seedream' || imageProvider === 'ark' ? arkImageModel : imageProvider === 'liblib' ? liblibModel : imageProvider === 'agnes' ? agnesModel : imageProvider === 'gemini' ? geminiModel : model}`);
   console.log(`Aesthetic analysis provider: ${aestheticAnalysisProvider}`);
   console.log(`Aesthetic analysis model: ${aestheticAnalysisModel}`);
   console.log(`Aesthetic image provider: ${aestheticImageProvider}`);
@@ -1478,6 +1574,7 @@ server.listen(port, () => {
   console.log(`Variant count: ${Math.max(1, Math.min(15, variantLimit))}, concurrency: ${variantConcurrency}`);
   console.log(process.env.OPENAI_API_KEY ? 'OPENAI_API_KEY: set' : 'OPENAI_API_KEY: missing');
   console.log(process.env.GEMINI_API_KEY ? 'GEMINI_API_KEY: set' : 'GEMINI_API_KEY: missing');
+  console.log(process.env.ARK_API_KEY ? 'ARK_API_KEY: set' : 'ARK_API_KEY: missing');
   console.log(process.env.AGNES_API_KEY ? 'AGNES_API_KEY: set' : 'AGNES_API_KEY: missing');
   console.log(process.env.LIBLIB_ACCESS_KEY && process.env.LIBLIB_SECRET_KEY ? 'LIBLIB_KEYS: set' : 'LIBLIB_KEYS: missing');
 });

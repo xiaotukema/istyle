@@ -1,20 +1,22 @@
 # iStyle Hair Try-On
 
-Camera-based AI hairstyle recommendation and try-on prototype, with a WeChat Mini Program version scaffold.
+WeChat Mini Program hairstyle recommendation and try-on backend, optimized for
+China-accessible model providers.
 
 ## Features
 
-- Gemini-powered hairstyle analysis and image try-on.
+- Volcengine Ark / Doubao-powered hairstyle analysis.
+- Seedream-powered image try-on.
 - Identity lock prompt: only change hairstyle, preserve the user's face and recognizability.
 - First run generates 5 hairstyles, then two "more recommendations" batches of 3 each.
 - Daily quota control: 11 generated hairstyles per user per day.
 - WeChat Mini Program login scaffold using `wx.login` and backend token sessions.
 
-## Local Web
+## Local / CloudBase Backend
 
 ```bash
 cp .env.example .env
-# Fill GEMINI_API_KEY and optional WeChat credentials.
+# Fill ARK_API_KEY and optional WeChat credentials.
 npm start
 ```
 
@@ -28,14 +30,15 @@ http://127.0.0.1:8000/
 
 The Mini Program source is in `miniprogram/`.
 
-For local development, open `miniprogram/` in WeChat DevTools. The backend supports dev login without `WX_APPID/WX_APP_SECRET`, but production must configure real credentials.
+For local development, open `miniprogram/` in WeChat DevTools. Production
+uses WeChat CloudBase Run and `wx.cloud.callContainer`.
 
 Production requirements:
 
-- HTTPS backend domain.
-- The domain must be added to WeChat Mini Program legal request domains.
-- Set `WX_APPID` and `WX_APP_SECRET` on the backend.
-- Set `GEMINI_API_KEY` on the backend.
+- WeChat CloudBase Run service.
+- Set `ARK_API_KEY` on the backend.
+- Set `IMAGE_PROVIDER=seedream`.
+- Set `ANALYSIS_PROVIDER=ark`.
 - Persist quota data in a real database before production traffic.
 
 ## Cost Control
