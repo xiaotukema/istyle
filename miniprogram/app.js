@@ -9,8 +9,8 @@ App({
 
   globalData: {
     useCloudContainer: true,
-    cloudEnv: 'cloudbase-d3gvks8mve656203b',
-    cloudService: 'istyle',
+    cloudEnv: 'prod-d3gvnehwy4403676a',
+    cloudService: 'express-9jah',
     apiBase: 'http://127.0.0.1:8000',
     token: '',
     quota: null

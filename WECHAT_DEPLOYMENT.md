@@ -39,8 +39,8 @@ Open `miniprogram/` in WeChat DevTools.
 Update:
 
 - `miniprogram/project.config.json`: AppID is set to the real mini program AppID.
-- `miniprogram/app.js`: `cloudEnv` is set to `cloudbase-d3gvks8mve656203b`.
-- `miniprogram/app.js`: `cloudService` is set to the CloudBase Run service name, currently `istyle`.
+- `miniprogram/app.js`: `cloudEnv` is set to `prod-d3gvnehwy4403676a`.
+- `miniprogram/app.js`: `cloudService` is set to `express-9jah`.
 - Keep `useCloudContainer: true` for production.
 
 For local backend debugging, set `useCloudContainer: false` and keep `apiBase`
