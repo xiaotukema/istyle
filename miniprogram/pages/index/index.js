@@ -1,4 +1,4 @@
-const { login, request } = require('../../utils/api');
+const { request } = require('../../utils/api');
 
 const INITIAL_COUNT = 5;
 const MORE_COUNT = 3;
@@ -6,7 +6,7 @@ const TOTAL_COUNT = 11;
 
 Page({
   data: {
-    quota: { used: 0, remaining: 0, limit: 11 },
+    quota: { used: 0, remaining: TOTAL_COUNT, limit: TOTAL_COUNT },
     image: '',
     recommendations: [],
     styles: [],
@@ -19,14 +19,7 @@ Page({
     remainingCount: TOTAL_COUNT
   },
 
-  async onLoad() {
-    try {
-      const data = await login();
-      this.setData({ quota: data.quota || this.data.quota });
-    } catch (err) {
-      wx.showToast({ title: err.message || '登录失败', icon: 'none' });
-    }
-  },
+  onLoad() {},
 
   onCameraError(event) {
     wx.showToast({ title: event.detail && event.detail.errMsg ? event.detail.errMsg : '摄像头不可用', icon: 'none' });
