@@ -9,6 +9,36 @@ function ensureCloudReady() {
   app.globalData.cloudReady = true;
 }
 
+function uploadCapture(filePath) {
+  ensureCloudReady();
+  return new Promise((resolve, reject) => {
+    const suffix = filePath.includes('.png') ? 'png' : 'jpg';
+    const cloudPath = `captures/${Date.now()}-${Math.random().toString(16).slice(2)}.${suffix}`;
+    wx.cloud.uploadFile({
+      cloudPath,
+      filePath,
+      success(uploadRes) {
+        wx.cloud.getTempFileURL({
+          fileList: [uploadRes.fileID],
+          success(urlRes) {
+            const item = (urlRes.fileList || [])[0] || {};
+            if (!item.tempFileURL) {
+              reject(new Error('云存储没有返回图片临时地址'));
+              return;
+            }
+            resolve({
+              cloudFileId: uploadRes.fileID,
+              imageUrl: item.tempFileURL
+            });
+          },
+          fail: reject
+        });
+      },
+      fail: reject
+    });
+  });
+}
+
 function request(path, options = {}) {
   if (app.globalData.useCloudContainer && wx.cloud && wx.cloud.callContainer) {
     ensureCloudReady();
@@ -85,5 +115,6 @@ function login() {
 
 module.exports = {
   request,
-  login
+  login,
+  uploadCapture
 };

@@ -1,4 +1,4 @@
-const { request } = require('../../utils/api');
+const { request, uploadCapture } = require('../../utils/api');
 
 const INITIAL_COUNT = 5;
 const MORE_COUNT = 3;
@@ -30,13 +30,13 @@ Page({
     return new Promise((resolve, reject) => {
       camera.takePhoto({
         quality: 'high',
-        success: (res) => {
-          wx.getFileSystemManager().readFile({
-            filePath: res.tempImagePath,
-            encoding: 'base64',
-            success: (file) => resolve(`data:image/jpeg;base64,${file.data}`),
-            fail: reject
-          });
+        success: async (res) => {
+          try {
+            const uploaded = await uploadCapture(res.tempImagePath);
+            resolve(uploaded.imageUrl);
+          } catch (err) {
+            reject(err);
+          }
         },
         fail: reject
       });

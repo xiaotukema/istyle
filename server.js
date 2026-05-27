@@ -313,6 +313,27 @@ function readBody(req, limit = 18 * 1024 * 1024) {
   });
 }
 
+async function imageInputToDataUrl(input) {
+  const value = String(input || '').trim();
+  if (!value) throw new Error('缺少图片。');
+  if (value.startsWith('data:image/')) return value;
+  if (!/^https?:\/\//i.test(value)) throw new Error('图片地址格式无效。');
+
+  const response = await fetch(value);
+  if (!response.ok) {
+    throw new Error(`下载小程序图片失败：HTTP ${response.status}`);
+  }
+  const mimeType = (response.headers.get('content-type') || 'image/jpeg').split(';')[0].trim();
+  if (!/^image\/(png|jpe?g|webp)$/i.test(mimeType)) {
+    throw new Error(`小程序图片格式不支持：${mimeType}`);
+  }
+  const buffer = Buffer.from(await response.arrayBuffer());
+  if (buffer.length > 12 * 1024 * 1024) {
+    throw new Error('小程序图片过大，请重新拍摄。');
+  }
+  return `data:${mimeType.replace('image/jpg', 'image/jpeg')};base64,${buffer.toString('base64')}`;
+}
+
 function dataUrlToBlob(dataUrl) {
   const match = /^data:(image\/(?:png|jpeg|jpg|webp));base64,(.+)$/i.exec(dataUrl || '');
   if (!match) {
@@ -1372,7 +1393,8 @@ const server = createServer(async (req, res) => {
     if (req.method === 'POST' && req.url === '/api/hair-recommendation') {
       const body = await readBody(req);
       const payload = JSON.parse(body || '{}');
-      const result = await createHairRecommendation(payload.image, payload.metrics || {}, { count: payload.count });
+      const image = await imageInputToDataUrl(payload.image || payload.imageUrl);
+      const result = await createHairRecommendation(image, payload.metrics || {}, { count: payload.count });
       json(res, 200, result);
       return;
     }
@@ -1399,7 +1421,8 @@ const server = createServer(async (req, res) => {
       const user = sessionUser(req);
       const requested = Math.max(1, Math.min(15, Number(payload.limit || (payload.recommendations || []).length || tryOnLimit)));
       if (user) consumeQuota(user.openid, requested);
-      const result = await createRecommendedTryOns(payload.image, payload.recommendations || [], { limit: payload.limit });
+      const image = await imageInputToDataUrl(payload.image || payload.imageUrl);
+      const result = await createRecommendedTryOns(image, payload.recommendations || [], { limit: payload.limit });
       if (user) result.quota = quotaState(user.openid);
       json(res, 200, result);
       return;
