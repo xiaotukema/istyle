@@ -61,7 +61,7 @@ const liblibModel = process.env.LIBLIB_IMAGE_MODEL || 'star-3-alpha';
 const apiBase = process.env.OPENAI_API_BASE || 'https://api.openai.com/v1';
 const geminiApiBase = process.env.GEMINI_API_BASE || 'https://generativelanguage.googleapis.com/v1beta';
 const arkApiBase = process.env.ARK_API_BASE || 'https://ark.cn-beijing.volces.com/api/v3';
-const arkImageModel = process.env.ARK_IMAGE_MODEL || 'doubao-seedream-4-0-250828';
+const arkImageModel = process.env.ARK_IMAGE_MODEL || 'doubao-seedream-5-0-260128';
 const agnesApiBase = process.env.AGNES_API_BASE || 'https://apihub.agnes-ai.com/v1';
 const liblibApiBase = process.env.LIBLIB_API_BASE || 'https://openapi.liblibai.cloud';
 const variantLimit = Number(process.env.HAIR_VARIANT_LIMIT || (imageProvider === 'liblib' ? 5 : 15));
@@ -635,7 +635,7 @@ async function createGeminiRecommendation(imageDataUrl, metrics, count = 5) {
 async function createArkRecommendation(imageDataUrl, metrics, count = 5) {
   if (!process.env.ARK_API_KEY) throw new Error('缺少 ARK_API_KEY。');
   const imageUrl = dataUrlToArkImageUrl(imageDataUrl);
-  const response = await fetch(`${arkApiBase}/chat/completions`, {
+  const response = await fetch(`${arkApiBase}/responses`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -643,11 +643,11 @@ async function createArkRecommendation(imageDataUrl, metrics, count = 5) {
     },
     body: JSON.stringify({
       model: analysisModel,
-      messages: [{
+      input: [{
         role: 'user',
         content: [
-          { type: 'text', text: `${recommendationPrompt(metrics, count)}\n\n请只输出 JSON，不要输出 Markdown。` },
-          { type: 'image_url', image_url: { url: imageUrl } }
+          { type: 'input_image', image_url: imageUrl },
+          { type: 'input_text', text: `${recommendationPrompt(metrics, count)}\n\n请只输出 JSON，不要输出 Markdown。` }
         ]
       }],
       response_format: { type: 'json_object' },
@@ -658,7 +658,10 @@ async function createArkRecommendation(imageDataUrl, metrics, count = 5) {
   if (!response.ok) {
     throw new Error(payload.error?.message || payload.message || `火山方舟推荐失败：HTTP ${response.status}`);
   }
-  const text = payload.choices?.[0]?.message?.content || payload.output_text || '';
+  const text = payload.output_text
+    || payload.output?.flatMap((item) => item.content || []).map((part) => part.text).filter(Boolean).join('\n')
+    || payload.choices?.[0]?.message?.content
+    || '';
   if (!text) throw new Error('火山方舟推荐没有返回文本。');
   return JSON.parse(stripJsonFence(text));
 }
