@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="720" viewBox="0 0 720 720">
+  <defs>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="4"/>
+      <feOffset dy="6"/>
+      <feComponentTransfer><feFuncA type="linear" slope=".28"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <style>
+      :root { --hair: #2b201d; }
+      .shine { fill: none; stroke: rgba(255,255,255,.22); stroke-width: 8; stroke-linecap: round; }
+      .thick { stroke-width: 14; opacity: .5; }
+    </style>
+  </defs>
+  <g filter="url(#soft)">
+    
+    <path fill="var(--hair)" d="
+      M187.20000000000002 238
+      C110 70 610 64 452.79999999999995 238
+      C650 385.8 500 473.2 360 474.2
+      C220 473.2 70 385.8 187.20000000000002 238 Z"/>
+    
+    
+    <path class="shine" d="M258 105 C240 190 238 280 214 365"/>
+    <path class="shine" d="M360 94 C342 188 360 276 328 372"/>
+    <path class="shine" d="M458 110 C492 195 478 290 512 384"/>
+  
+    
+    
+    <path fill="rgba(0,0,0,.18)" d="M190 220 C238 188 278 196 318 228 C258 222 224 236 190 220ZM402 218 C462 190 516 198 548 232 C492 220 454 232 402 218Z"/>
+  
+  </g>
+  <metadata>重层次碎发</metadata>
+</svg>

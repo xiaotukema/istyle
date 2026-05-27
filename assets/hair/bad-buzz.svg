@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="720" viewBox="0 0 720 720">
+  <defs>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="4"/>
+      <feOffset dy="6"/>
+      <feComponentTransfer><feFuncA type="linear" slope=".28"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <style>
+      :root { --hair: #2a211d; }
+      .shine { fill: none; stroke: rgba(255,255,255,.22); stroke-width: 8; stroke-linecap: round; }
+      .thick { stroke-width: 14; opacity: .5; }
+    </style>
+  </defs>
+  <g filter="url(#soft)">
+    
+      <path fill="var(--hair)" d="M206 210 C238 94 476 90 520 210 C456 246 282 246 206 210Z"/>
+      <path fill="rgba(255,255,255,.12)" d="M248 164 C304 118 422 122 484 166 C424 150 316 150 248 164Z"/>
+    
+  </g>
+  <metadata>超短寸感</metadata>
+</svg>

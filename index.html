@@ -1,0 +1,1844 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <title>实时发型试戴</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --glass: rgba(10, 12, 15, 0.64);
+      --line: rgba(255, 255, 255, 0.22);
+      --text: rgba(255, 255, 255, 0.92);
+      --muted: rgba(255, 255, 255, 0.62);
+      --gold: #d9b36a;
+      --teal: #6bd5d0;
+      --rose: #e7a6ad;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html,
+    body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #050608;
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      user-select: none;
+    }
+
+    .camera,
+    #overlay {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      object-fit: cover;
+      background: #08090b;
+    }
+
+    .camera.mirror {
+      transform: scaleX(-1);
+    }
+
+    #overlay {
+      z-index: 2;
+      pointer-events: none;
+      background: transparent;
+    }
+
+    .shade {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      background:
+        linear-gradient(180deg, rgba(0, 0, 0, 0.25), transparent 36%, rgba(0, 0, 0, 0.46)),
+        radial-gradient(circle at 50% 24%, rgba(107, 213, 208, 0.16), transparent 35%);
+      pointer-events: none;
+    }
+
+    .topbar,
+    .dock,
+    .stylebar,
+    .analysis-card,
+    .camera-prompt {
+      position: fixed;
+      z-index: 4;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .topbar {
+      top: max(14px, env(safe-area-inset-top));
+      left: 14px;
+      right: 14px;
+      justify-content: space-between;
+    }
+
+    .brand {
+      min-height: 42px;
+      max-width: min(72vw, 560px);
+      padding: 10px 13px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      color: var(--muted);
+      background: var(--glass);
+      backdrop-filter: blur(18px) saturate(1.24);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .brand strong {
+      display: block;
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 780;
+    }
+
+    .brand.error {
+      max-width: min(92vw, 760px);
+      white-space: pre-wrap;
+      color: #ffd6d6;
+      border-color: rgba(255, 120, 120, 0.5);
+      background: rgba(38, 12, 16, 0.78);
+    }
+
+    button,
+    .save-link {
+      height: 44px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      color: var(--text);
+      background: var(--glass);
+      backdrop-filter: blur(18px) saturate(1.24);
+      appearance: none;
+      cursor: pointer;
+      font: inherit;
+      text-decoration: none;
+      transition: transform 150ms ease, border-color 150ms ease, background 150ms ease;
+    }
+
+    button:active,
+    .save-link:active {
+      transform: scale(0.97);
+    }
+
+    .icon-button {
+      width: 44px;
+      display: grid;
+      place-items: center;
+      padding: 0;
+      flex: 0 0 auto;
+    }
+
+    .icon-button svg {
+      width: 21px;
+      height: 21px;
+      stroke: currentColor;
+      stroke-width: 1.9;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .stylebar {
+      left: 50%;
+      bottom: max(76px, calc(env(safe-area-inset-bottom) + 76px));
+      transform: translateX(-50%);
+      width: min(720px, calc(100vw - 28px));
+      overflow-x: auto;
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: rgba(10, 12, 15, 0.62);
+      backdrop-filter: blur(20px) saturate(1.2);
+      scrollbar-width: none;
+    }
+
+    .stylebar::-webkit-scrollbar {
+      display: none;
+    }
+
+    .style-button {
+      flex: 0 0 auto;
+      min-width: 108px;
+      padding: 0 12px;
+      font-size: 12px;
+      font-weight: 720;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .style-button.active {
+      color: #101313;
+      border-color: rgba(255, 255, 255, 0.72);
+      background: linear-gradient(135deg, var(--teal), var(--gold) 56%, var(--rose));
+      box-shadow: 0 14px 40px rgba(217, 179, 106, 0.22);
+    }
+
+    .style-empty {
+      flex: 1;
+      min-width: 220px;
+      min-height: 56px;
+      padding: 0 14px;
+      color: #101313;
+      border-color: rgba(255, 255, 255, 0.66);
+      background: linear-gradient(135deg, var(--teal), var(--gold) 56%, var(--rose));
+      font-size: 14px;
+      line-height: 1;
+      font-weight: 820;
+      letter-spacing: 0.04em;
+      text-align: center;
+    }
+
+    button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .dock {
+      left: 50%;
+      bottom: max(16px, env(safe-area-inset-bottom));
+      transform: translateX(-50%);
+      width: min(360px, calc(100vw - 28px));
+      justify-content: center;
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: rgba(10, 12, 15, 0.72);
+      backdrop-filter: blur(20px) saturate(1.2);
+    }
+
+    .dock[hidden] {
+      display: none;
+    }
+
+    .camera-prompt {
+      left: 50%;
+      top: 50%;
+      width: min(420px, calc(100vw - 32px));
+      transform: translate(-50%, -50%);
+      flex-direction: column;
+      align-items: stretch;
+      padding: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.24);
+      border-radius: 10px;
+      background: rgba(10, 12, 15, 0.78);
+      backdrop-filter: blur(20px) saturate(1.2);
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .camera-prompt[hidden] {
+      display: none;
+    }
+
+    .camera-prompt strong {
+      color: var(--text);
+      font-size: 15px;
+    }
+
+    .analysis-card {
+      right: 14px;
+      bottom: max(142px, calc(env(safe-area-inset-bottom) + 142px));
+      width: min(320px, calc(100vw - 28px));
+      align-items: stretch;
+      flex-direction: column;
+      padding: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 10px;
+      color: var(--muted);
+      background: rgba(10, 12, 15, 0.6);
+      backdrop-filter: blur(18px) saturate(1.22);
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    .analysis-card strong {
+      color: var(--text);
+      font-size: 13px;
+    }
+
+    .analysis-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 7px;
+    }
+
+    .analysis-item {
+      min-width: 0;
+      padding: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .analysis-item span {
+      display: block;
+      margin-bottom: 2px;
+      color: rgba(255, 255, 255, 0.48);
+      font-size: 10px;
+    }
+
+    .analysis-note {
+      color: rgba(255, 255, 255, 0.55);
+    }
+
+    .analysis-action {
+      display: none;
+    }
+
+    .tryon-panel {
+      position: fixed;
+      left: 14px;
+      bottom: max(142px, calc(env(safe-area-inset-bottom) + 142px));
+      z-index: 3;
+      width: min(320px, calc(100vw - 28px));
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.28);
+      border-radius: 10px;
+      background: rgba(10, 12, 15, 0.5);
+      backdrop-filter: blur(22px) saturate(1.28);
+      box-shadow: 0 22px 72px rgba(0, 0, 0, 0.32);
+    }
+
+    .tryon-panel[hidden] {
+      display: none;
+    }
+
+    .tryon-panel img {
+      display: block;
+      width: 100%;
+      aspect-ratio: 3 / 4;
+      object-fit: cover;
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .tryon-panel img[hidden] {
+      display: none;
+    }
+
+    body.tryon-ready .tryon-panel {
+      left: 0;
+      top: 0;
+      bottom: 0;
+      z-index: 5;
+      width: 50vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      border-width: 0 1px 0 0;
+      border-radius: 0;
+      transform: none;
+      background: rgba(8, 10, 12, 0.46);
+    }
+
+    body.tryon-ready .tryon-panel img {
+      flex: 1 1 auto;
+      min-height: 0;
+      max-height: none;
+      object-fit: cover;
+      padding-bottom: 76px;
+    }
+
+    body.tryon-ready .tryon-caption {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 72px;
+      min-height: 72px;
+      background: linear-gradient(180deg, rgba(5, 6, 8, 0), rgba(5, 6, 8, 0.9) 24%, rgba(5, 6, 8, 0.96));
+    }
+
+    body.tryon-ready .camera {
+      left: 50vw;
+      right: 0;
+      width: 50vw;
+      height: 100vh;
+      z-index: 0;
+      border-left: 1px solid rgba(255, 255, 255, 0.16);
+    }
+
+    body.tryon-ready .shade,
+    body.tryon-ready #overlay {
+      left: 50vw;
+      width: 50vw;
+    }
+
+    body.tryon-ready .stylebar {
+      left: 25vw;
+      bottom: max(12px, env(safe-area-inset-bottom));
+      z-index: 7;
+      width: min(48vw, 720px);
+      background: rgba(5, 6, 8, 0.82);
+    }
+
+    body.tryon-ready .dock {
+      left: 75vw;
+      width: min(42vw, 360px);
+    }
+
+    .tryon-loading {
+      display: grid;
+      min-height: 168px;
+      place-items: center;
+      padding: 20px;
+      background:
+        radial-gradient(circle at 50% 36%, rgba(107, 213, 208, 0.2), transparent 42%),
+        rgba(255, 255, 255, 0.04);
+    }
+
+    .tryon-loading[hidden] {
+      display: none;
+    }
+
+    .spinner {
+      width: 42px;
+      height: 42px;
+      border: 2px solid rgba(255, 255, 255, 0.18);
+      border-top-color: var(--teal);
+      border-right-color: var(--gold);
+      border-radius: 999px;
+      animation: spin 900ms linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .tryon-caption {
+      padding: 10px 11px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .tryon-caption strong {
+      display: block;
+      color: var(--text);
+      font-size: 13px;
+      margin-bottom: 2px;
+    }
+
+    .primary,
+    .save-link {
+      flex: 1;
+      min-width: 0;
+      display: grid;
+      place-items: center;
+      padding: 0 16px;
+      font-size: 12px;
+      font-weight: 760;
+      letter-spacing: 0.08em;
+    }
+
+    .primary {
+      color: #111313;
+      border-color: rgba(255, 255, 255, 0.66);
+      background: linear-gradient(135deg, var(--teal), var(--gold) 56%, var(--rose));
+    }
+
+    .secondary {
+      color: var(--text);
+      background: rgba(10, 12, 15, 0.66);
+    }
+
+    .quota-reached {
+      opacity: 0.42;
+    }
+
+    .save-link[aria-disabled="true"] {
+      opacity: 0.42;
+      pointer-events: none;
+    }
+
+    .flash {
+      position: fixed;
+      inset: 0;
+      z-index: 5;
+      pointer-events: none;
+      background: #fff;
+      opacity: 0;
+    }
+
+    .flash.pop {
+      animation: flash 420ms ease-out;
+    }
+
+    .snap-burst {
+      position: fixed;
+      left: 50%;
+      top: 42%;
+      z-index: 3;
+      width: min(54vw, 260px);
+      aspect-ratio: 1;
+      pointer-events: none;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0);
+      opacity: 0;
+      transform: translate(-50%, -50%) scale(0.3);
+      box-shadow:
+        0 0 0 0 rgba(107, 213, 208, 0),
+        inset 0 0 28px rgba(255, 255, 255, 0);
+    }
+
+    .snap-burst.pop {
+      animation: snapBurst 720ms cubic-bezier(.16, 1, .3, 1);
+    }
+
+    @keyframes flash {
+      0% { opacity: 0; }
+      15% { opacity: 0.78; }
+      100% { opacity: 0; }
+    }
+
+    @keyframes snapBurst {
+      0% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.25) rotate(-8deg);
+        border-color: rgba(107, 213, 208, 0);
+      }
+      18% {
+        opacity: 1;
+        border-color: rgba(255, 255, 255, 0.92);
+        box-shadow:
+          0 0 0 14px rgba(107, 213, 208, 0.24),
+          0 0 72px rgba(217, 179, 106, 0.46),
+          inset 0 0 36px rgba(255, 255, 255, 0.28);
+      }
+      100% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(1.45) rotate(8deg);
+        border-color: rgba(255, 255, 255, 0);
+        box-shadow:
+          0 0 0 62px rgba(107, 213, 208, 0),
+          0 0 96px rgba(217, 179, 106, 0),
+          inset 0 0 36px rgba(255, 255, 255, 0);
+      }
+    }
+
+    #captureCanvas {
+      display: none;
+    }
+
+    @media (max-width: 520px) {
+      .brand {
+        max-width: calc(100vw - 84px);
+      }
+
+      .stylebar {
+        bottom: max(74px, calc(env(safe-area-inset-bottom) + 74px));
+      }
+
+      .analysis-card {
+        right: 14px;
+        bottom: max(138px, calc(env(safe-area-inset-bottom) + 138px));
+        width: calc(100vw - 28px);
+      }
+
+      .tryon-panel {
+        left: 14px;
+        bottom: max(326px, calc(env(safe-area-inset-bottom) + 326px));
+        width: min(44vw, 180px);
+      }
+
+      .tryon-caption {
+        padding: 8px;
+      }
+
+      .primary,
+      .save-link {
+        padding: 0 10px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <video id="camera" class="camera mirror" playsinline muted autoplay></video>
+  <div class="shade"></div>
+  <canvas id="overlay" aria-label="实时发型试戴画布"></canvas>
+
+  <div class="topbar">
+    <div id="status" class="brand">
+      <strong>实时发型试戴</strong>
+      摄像头初始化中
+    </div>
+    <button id="switchCamera" class="icon-button" type="button" aria-label="切换摄像头" title="切换摄像头">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M3 7h3l2-2h8l2 2h3v12H3z" />
+        <path d="M9 13a3 3 0 1 0 6 0a3 3 0 0 0-6 0z" />
+        <path d="M17.5 10.2h1.7v1.7" />
+        <path d="M19.2 10.2a6.7 6.7 0 0 1-2 7.2" />
+      </svg>
+    </button>
+  </div>
+
+  <div id="stylebar" class="stylebar" aria-label="发型选择"></div>
+
+  <div id="cameraPrompt" class="camera-prompt" hidden>
+    <strong>需要摄像头权限</strong>
+    <span id="cameraPromptText">点击下方按钮重新请求摄像头权限。</span>
+    <button id="enableCamera" class="primary" type="button">启用摄像头</button>
+  </div>
+
+  <div id="analysisCard" class="analysis-card">
+    <strong>专属发型推荐</strong>
+    <div id="analysisGrid" class="analysis-grid">
+      <div class="analysis-item"><span>脸型</span><b>等待识别</b></div>
+      <div class="analysis-item"><span>发量</span><b>等待识别</b></div>
+      <div class="analysis-item"><span>发质</span><b>等待识别</b></div>
+      <div class="analysis-item"><span>风格</span><b>推荐中</b></div>
+    </div>
+    <div id="analysisNote" class="analysis-note">点击开始后先生成 5 款，完成后可继续推荐更多。</div>
+  </div>
+
+  <div id="tryonPanel" class="tryon-panel" hidden>
+    <div id="tryonLoading" class="tryon-loading" hidden>
+      <div class="spinner" aria-hidden="true"></div>
+    </div>
+    <img id="tryonImage" alt="AI 高质量试戴图" hidden />
+    <div id="tryonCaption" class="tryon-caption">
+      <strong>AI 高质量试戴图</strong>
+      <span>生成完成后会自动显示。</span>
+    </div>
+  </div>
+
+  <div id="dock" class="dock" hidden>
+    <button id="capture" class="primary" type="button">推荐更多</button>
+    <button id="saveShot" class="secondary primary" type="button">保存截图</button>
+    <button id="prevStyle" class="icon-button" type="button" aria-label="上一款发型" title="上一款发型">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6l6-6" /></svg>
+    </button>
+    <button id="nextStyle" class="icon-button" type="button" aria-label="下一款发型" title="下一款发型">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18l6-6l-6-6" /></svg>
+    </button>
+  </div>
+
+  <div id="flash" class="flash"></div>
+  <div id="snapBurst" class="snap-burst" aria-hidden="true"></div>
+  <canvas id="captureCanvas"></canvas>
+
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4/face_mesh.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4/hands.js" crossorigin="anonymous"></script>
+  <script>
+    (() => {
+      'use strict';
+
+      const video = document.getElementById('camera');
+      const overlay = document.getElementById('overlay');
+      const overlayCtx = overlay.getContext('2d');
+      const statusEl = document.getElementById('status');
+      const switchCameraButton = document.getElementById('switchCamera');
+      const dock = document.getElementById('dock');
+      const recommendMoreButton = document.getElementById('capture');
+      const saveShotButton = document.getElementById('saveShot');
+      const prevStyleButton = document.getElementById('prevStyle');
+      const nextStyleButton = document.getElementById('nextStyle');
+      const stylebar = document.getElementById('stylebar');
+      const analysisGrid = document.getElementById('analysisGrid');
+      const analysisNote = document.getElementById('analysisNote');
+      const tryonPanel = document.getElementById('tryonPanel');
+      const tryonLoading = document.getElementById('tryonLoading');
+      const tryonImage = document.getElementById('tryonImage');
+      const tryonCaption = document.getElementById('tryonCaption');
+      const cameraPrompt = document.getElementById('cameraPrompt');
+      const cameraPromptText = document.getElementById('cameraPromptText');
+      const enableCameraButton = document.getElementById('enableCamera');
+      const flash = document.getElementById('flash');
+      const snapBurst = document.getElementById('snapBurst');
+      const captureCanvas = document.getElementById('captureCanvas');
+      const captureCtx = captureCanvas.getContext('2d');
+
+      const styleCatalog = [
+        {
+          id: 'real-layered-brown',
+          label: '真人层次卷',
+          asset: 'assets/hair/real/layered-brown-wig.png',
+          fit: { width: 2.24, height: 1.78, top: -0.56, faceRx: 0.31, faceRy: 0.39, faceCy: 0.15 },
+          shapes: ['oval', 'oblong', 'square'],
+          volume: ['thin', 'medium'],
+          texture: ['soft', 'wavy'],
+          vibe: '柔和修饰'
+        },
+        {
+          id: 'real-black-long',
+          label: '真人黑长卷',
+          asset: 'assets/hair/real/short-crop-wig.png',
+          fit: { width: 2.08, height: 1.82, top: -0.58, faceRx: 0.29, faceRy: 0.4, faceCy: 0.13 },
+          shapes: ['heart', 'oval', 'round'],
+          volume: ['medium', 'thick'],
+          texture: ['soft', 'wavy'],
+          vibe: '显脸小'
+        },
+        {
+          id: 'best-french-layered',
+          label: '法式层次',
+          fit: { width: 1.78, height: 1.18, top: -0.58, faceRx: 0.29, faceRy: 0.42, faceCy: 0.18 },
+          shapes: ['oval', 'heart', 'square'],
+          volume: ['medium', 'thick'],
+          texture: ['soft', 'straight'],
+          vibe: '高级感'
+        },
+        {
+          id: 'best-side-waves',
+          label: '侧分微卷',
+          fit: { width: 1.92, height: 1.26, top: -0.56, faceRx: 0.28, faceRy: 0.42, faceCy: 0.18 },
+          shapes: ['round', 'square', 'oval'],
+          volume: ['thin', 'medium'],
+          texture: ['wavy', 'soft'],
+          vibe: '提气场'
+        },
+        {
+          id: 'best-textured-mid',
+          label: '纹理中短',
+          fit: { width: 1.72, height: 1.16, top: -0.55, faceRx: 0.28, faceRy: 0.42, faceCy: 0.18 },
+          shapes: ['oblong', 'oval', 'heart'],
+          volume: ['medium', 'thick'],
+          texture: ['straight', 'soft'],
+          vibe: '利落'
+        },
+        {
+          id: 'best-collarbone-lob',
+          label: '锁骨内扣',
+          fit: { width: 1.86, height: 1.28, top: -0.56, faceRx: 0.29, faceRy: 0.42, faceCy: 0.18 },
+          shapes: ['round', 'square', 'heart'],
+          volume: ['thin', 'medium'],
+          texture: ['straight', 'soft'],
+          vibe: '修饰下颌'
+        },
+        {
+          id: 'best-air-bangs-long',
+          label: '空气刘海',
+          fit: { width: 1.94, height: 1.34, top: -0.58, faceRx: 0.3, faceRy: 0.41, faceCy: 0.17 },
+          shapes: ['oblong', 'heart', 'oval'],
+          volume: ['medium', 'thick'],
+          texture: ['soft', 'straight'],
+          vibe: '缩短中庭'
+        },
+        {
+          id: 'ok-curtain-bangs',
+          label: '八字刘海',
+          fit: { width: 1.88, height: 1.22, top: -0.57, faceRx: 0.29, faceRy: 0.42, faceCy: 0.18 },
+          shapes: ['round', 'square', 'heart'],
+          volume: ['thin', 'medium'],
+          texture: ['soft', 'wavy'],
+          vibe: '柔化颧骨'
+        },
+        {
+          id: 'ok-shoulder-flip',
+          label: '齐肩外翻',
+          fit: { width: 1.9, height: 1.26, top: -0.55, faceRx: 0.29, faceRy: 0.42, faceCy: 0.18 },
+          shapes: ['oval', 'oblong', 'square'],
+          volume: ['medium'],
+          texture: ['straight', 'soft'],
+          vibe: '轻熟'
+        },
+        {
+          id: 'ok-low-layer-long',
+          label: '低层次长发',
+          fit: { width: 1.98, height: 1.38, top: -0.56, faceRx: 0.3, faceRy: 0.42, faceCy: 0.18 },
+          shapes: ['heart', 'oval', 'square'],
+          volume: ['thick', 'medium'],
+          texture: ['straight', 'wavy'],
+          vibe: '自然'
+        },
+        {
+          id: 'ok-wet-back',
+          label: '湿发后梳',
+          fit: { width: 1.72, height: 1.08, top: -0.6, faceRx: 0.27, faceRy: 0.43, faceCy: 0.2 },
+          shapes: ['oval', 'oblong'],
+          volume: ['medium', 'thick'],
+          texture: ['straight', 'soft'],
+          vibe: '锋利'
+        }
+      ];
+
+      const INITIAL_TRYON_COUNT = 5;
+      const MORE_TRYON_COUNT = 3;
+      const TOTAL_TRYON_COUNT = 11;
+
+      let hairStyles = [];
+      let allRecommendations = [];
+      let analysisResult = null;
+      let analysisLocked = false;
+      let recommendationVisible = false;
+      let prewarmPromise = null;
+      let prewarmFailed = '';
+      let recommendationBusy = false;
+      let tryOnBusy = false;
+      let lastRecommendationImage = '';
+      let lastAnalysisAt = 0;
+      let facingMode = 'user';
+      let activeFacingMode = 'user';
+      let currentDeviceId = '';
+      let stream = null;
+      let faceMesh = null;
+      let hands = null;
+      let faceBusy = false;
+      let handBusy = false;
+      let lastVisionAt = 0;
+      let lastHandAt = 0;
+      let lastTrackAt = 0;
+      let snapPrimed = false;
+      let snapPrimeAt = 0;
+      let lastSnapDistance = 1;
+      let lastMiddleTip = null;
+      let lastSnapAt = 0;
+      let lastPinchClosed = false;
+      let loopId = 0;
+      let renderId = 0;
+      let switchingCamera = false;
+      let lastLandmarks = null;
+      let smoothedTarget = null;
+      let trackingState = '';
+      let statusHoldUntil = 0;
+      let currentStyle = 0;
+      let startAiRecommendButton = null;
+      let toastTimer = 0;
+      const hairImages = new Map();
+
+      function setStatus(main, sub = '', error = false) {
+        statusEl.className = error ? 'brand error' : 'brand';
+        statusEl.innerHTML = `<strong>${main}</strong>${sub}`;
+      }
+
+      function showError(main, err) {
+        const details = err && (err.message || err.stack || String(err));
+        setStatus(main, details || '', true);
+      }
+
+      function showToast(message) {
+        setStatus('提示', message);
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => {
+          setStatus('实时发型试戴', `${activeFacingMode === 'user' ? '前' : '后'}摄像头已开启 · ${currentStyleLabel()}`);
+        }, 1800);
+      }
+
+      function showCameraPrompt(message) {
+        cameraPromptText.textContent = message || '点击下方按钮重新请求摄像头权限。';
+        cameraPrompt.hidden = false;
+      }
+
+      function hideCameraPrompt() {
+        cameraPrompt.hidden = true;
+      }
+
+      function currentStyleLabel() {
+        return hairStyles[currentStyle]?.label || '等待推荐';
+      }
+
+      function generatedStyleCount() {
+        return hairStyles.filter((style) => style.tryonImage).length;
+      }
+
+      function remainingRecommendations() {
+        const visibleIds = new Set(hairStyles.map((style) => style.id));
+        return allRecommendations.filter((style) => !visibleIds.has(style.id));
+      }
+
+      function renderDock() {
+        const hasStyles = hairStyles.length > 0;
+        dock.hidden = !recommendationVisible || !hasStyles || recommendationBusy || tryOnBusy;
+        const remaining = remainingRecommendations().length;
+        recommendMoreButton.textContent = remaining ? '推荐更多' : '今日已达上限';
+        recommendMoreButton.disabled = !hasStyles || tryOnBusy || recommendationBusy;
+        recommendMoreButton.classList.toggle('quota-reached', hasStyles && !remaining);
+        const canSave = !!hairStyles[currentStyle]?.tryonImage;
+        saveShotButton.disabled = !canSave;
+        saveShotButton.title = canSave ? '保存当前 AI 试戴图' : '试戴图生成完成后可保存';
+        prevStyleButton.disabled = generatedStyleCount() < 2;
+        nextStyleButton.disabled = generatedStyleCount() < 2;
+      }
+
+      function saveCurrentTryOn() {
+        const style = hairStyles[currentStyle];
+        if (!style?.tryonImage) return;
+        const link = document.createElement('a');
+        const safeName = (style.label || 'hairstyle').replace(/[^\u4e00-\u9fa5a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '') || 'hairstyle';
+        link.href = style.tryonImage;
+        link.download = `istyle-${safeName}.png`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setStatus('已保存当前试戴图', `${style.rank || currentStyle + 1}. ${style.label}`);
+      }
+
+      function loadImage(src) {
+        return new Promise((resolve, reject) => {
+          const image = new Image();
+          image.onload = () => resolve(image);
+          image.onerror = () => reject(new Error(`加载素材失败：${src}`));
+          image.src = src;
+        });
+      }
+
+      async function loadHairAssets() {
+        await Promise.all(styleCatalog.map(async (style) => {
+          hairImages.set(style.id, await loadImage(style.asset || `assets/hair/${style.id}.svg`));
+        }));
+      }
+
+      function describeCameraError(err, requestedFacing) {
+        const name = err && err.name ? err.name : 'CameraError';
+        const message = err && err.message ? err.message : String(err || '');
+        if (name === 'NotAllowedError' || /permission/i.test(message)) {
+          return `浏览器拒绝了摄像头权限。请在地址栏允许 127.0.0.1 使用摄像头，然后刷新页面。原始错误：${message || name}`;
+        }
+        if (name === 'NotFoundError' || name === 'OverconstrainedError') {
+          return `${requestedFacing === 'environment' ? '后' : '前'}摄像头不可用。原始错误：${message || name}`;
+        }
+        return `${requestedFacing === 'environment' ? '后' : '前'}摄像头打开失败。原始错误：${message || name}`;
+      }
+
+      async function getVideoDevices() {
+        try {
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          return devices.filter((device) => device.kind === 'videoinput');
+        } catch (err) {
+          return [];
+        }
+      }
+
+      function deviceMatchesFacing(device, requestedFacing) {
+        const label = (device.label || '').toLowerCase();
+        if (requestedFacing === 'environment') return /back|rear|environment|world|后|背/.test(label);
+        return /front|user|face|facetime|前|正/.test(label);
+      }
+
+      async function buildCameraAttempts(requestedFacing, preferNextDevice) {
+        const size = { width: { ideal: 1280 }, height: { ideal: 960 } };
+        const attempts = [];
+        const devices = await getVideoDevices();
+        const otherDevices = devices.filter((device) => device.deviceId && device.deviceId !== currentDeviceId);
+        const matched = otherDevices.filter((device) => deviceMatchesFacing(device, requestedFacing));
+        const rest = otherDevices.filter((device) => !matched.includes(device));
+        const orderedDevices = preferNextDevice ? [...matched, ...rest] : matched;
+        orderedDevices.forEach((device) => {
+          attempts.push({
+            constraints: { audio: false, video: { deviceId: { exact: device.deviceId }, ...size } }
+          });
+        });
+        attempts.push({ constraints: { audio: false, video: { facingMode: { ideal: requestedFacing }, ...size } } });
+        if (!stream) attempts.push({ constraints: { audio: false, video: size } });
+        return attempts;
+      }
+
+      async function startCamera(requestedFacing = facingMode, options = {}) {
+        const attempts = await buildCameraAttempts(requestedFacing, !!options.preferNextDevice);
+        let nextStream = null;
+        let lastError = null;
+        for (const attempt of attempts) {
+          try {
+            nextStream = await navigator.mediaDevices.getUserMedia(attempt.constraints);
+            break;
+          } catch (err) {
+            lastError = err;
+          }
+        }
+        if (!nextStream) throw new Error(describeCameraError(lastError, requestedFacing));
+
+        const previousStream = stream;
+        stream = nextStream;
+        video.srcObject = stream;
+        await video.play();
+        if (previousStream) previousStream.getTracks().forEach((track) => track.stop());
+        hideCameraPrompt();
+
+        const [track] = stream.getVideoTracks();
+        const settings = track ? track.getSettings() : {};
+        currentDeviceId = settings.deviceId || '';
+        activeFacingMode = settings.facingMode || requestedFacing;
+        facingMode = requestedFacing;
+        video.classList.toggle('mirror', activeFacingMode === 'user');
+        setStatus('实时发型试戴', `${activeFacingMode === 'user' ? '前' : '后'}摄像头已开启 · ${currentStyleLabel()}`);
+      }
+
+      async function setupVision() {
+        if (!window.FaceMesh) throw new Error('MediaPipe FaceMesh 加载失败');
+        if (!window.Hands) throw new Error('MediaPipe Hands 加载失败');
+        faceMesh = new window.FaceMesh({
+          locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4/${file}`
+        });
+        faceMesh.setOptions({
+          maxNumFaces: 1,
+          refineLandmarks: false,
+          minDetectionConfidence: 0.55,
+          minTrackingConfidence: 0.55
+        });
+        faceMesh.onResults(onFace);
+        hands = new window.Hands({
+          locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4/${file}`
+        });
+        hands.setOptions({
+          maxNumHands: 1,
+          modelComplexity: 1,
+          minDetectionConfidence: 0.34,
+          minTrackingConfidence: 0.3
+        });
+        hands.onResults(onHands);
+      }
+
+      function onFace(results) {
+        const landmarks = results.multiFaceLandmarks && results.multiFaceLandmarks[0];
+        if (!landmarks) return;
+        lastLandmarks = landmarks;
+        lastTrackAt = performance.now();
+        if (
+          !prewarmPromise &&
+          !recommendationVisible &&
+          !recommendationBusy &&
+          !hairStyles.length &&
+          performance.now() - lastAnalysisAt > 900
+        ) {
+          lastAnalysisAt = performance.now();
+          prewarmPromise = analyzeAndRecommend(landmarks, { reveal: false })
+            .catch((err) => {
+              prewarmFailed = err.message || String(err);
+            });
+        }
+      }
+
+      async function visionLoop(now) {
+        if (video.readyState >= 2 && !switchingCamera && !faceBusy && now - lastVisionAt > 66) {
+          faceBusy = true;
+          lastVisionAt = now;
+          faceMesh.send({ image: video }).catch((err) => showError('面部定位失败', err)).finally(() => {
+            faceBusy = false;
+          });
+        }
+        if (video.readyState >= 2 && !switchingCamera && !handBusy && now - lastHandAt > 52) {
+          handBusy = true;
+          lastHandAt = now;
+          hands.send({ image: video }).catch((err) => showError('手势识别失败', err)).finally(() => {
+            handBusy = false;
+          });
+        }
+        loopId = requestAnimationFrame(visionLoop);
+      }
+
+      function resizeOverlay() {
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const width = Math.max(1, Math.floor(window.innerWidth * dpr));
+        const height = Math.max(1, Math.floor(window.innerHeight * dpr));
+        if (overlay.width !== width || overlay.height !== height) {
+          overlay.width = width;
+          overlay.height = height;
+        }
+      }
+
+      function coverRect(sourceW, sourceH, destW, destH) {
+        const sourceRatio = sourceW / sourceH;
+        const destRatio = destW / destH;
+        let w = destW;
+        let h = destH;
+        let x = 0;
+        let y = 0;
+        if (sourceRatio > destRatio) {
+          h = destH;
+          w = h * sourceRatio;
+          x = (destW - w) / 2;
+        } else {
+          w = destW;
+          h = w / sourceRatio;
+          y = (destH - h) / 2;
+        }
+        return { x, y, w, h };
+      }
+
+      function clamp(value, min, max) {
+        return Math.max(min, Math.min(max, value));
+      }
+
+      function distance(a, b) {
+        return Math.hypot(a.x - b.x, a.y - b.y);
+      }
+
+      function pointFromLandmark(landmark, rect) {
+        const x = activeFacingMode === 'user' ? 1 - landmark.x : landmark.x;
+        return {
+          x: rect.x + x * rect.w,
+          y: rect.y + landmark.y * rect.h
+        };
+      }
+
+      function landmarkDistance(landmarks, a, b) {
+        return Math.hypot(landmarks[a].x - landmarks[b].x, landmarks[a].y - landmarks[b].y);
+      }
+
+      function classifyFaceShape(landmarks) {
+        const faceHeight = landmarkDistance(landmarks, 10, 152);
+        const cheekWidth = landmarkDistance(landmarks, 234, 454);
+        const jawWidth = landmarkDistance(landmarks, 172, 397);
+        const foreheadWidth = landmarkDistance(landmarks, 103, 332);
+        const ratio = faceHeight / Math.max(0.001, cheekWidth);
+        const jawRatio = jawWidth / Math.max(0.001, cheekWidth);
+        const foreheadRatio = foreheadWidth / Math.max(0.001, cheekWidth);
+        if (ratio > 1.52) return { id: 'oblong', label: '长形脸', ratio, jawRatio, foreheadRatio };
+        if (ratio < 1.22 && jawRatio > 0.74) return { id: 'round', label: '圆形脸', ratio, jawRatio, foreheadRatio };
+        if (jawRatio > 0.84 && ratio < 1.42) return { id: 'square', label: '方形脸', ratio, jawRatio, foreheadRatio };
+        if (foreheadRatio > jawRatio + 0.1) return { id: 'heart', label: '心形脸', ratio, jawRatio, foreheadRatio };
+        return { id: 'oval', label: '鹅蛋脸', ratio, jawRatio, foreheadRatio };
+      }
+
+      function sampleHairProfile(landmarks) {
+        if (video.readyState < 2 || !video.videoWidth || !video.videoHeight) {
+          return { volume: 'medium', volumeLabel: '中等', texture: 'soft', textureLabel: '柔顺' };
+        }
+        const width = 96;
+        const height = 128;
+        captureCanvas.width = width;
+        captureCanvas.height = height;
+        captureCtx.clearRect(0, 0, width, height);
+        captureCtx.drawImage(video, 0, 0, width, height);
+        const left = Math.max(0, Math.floor((Math.min(landmarks[234].x, landmarks[454].x) - 0.1) * width));
+        const right = Math.min(width - 1, Math.ceil((Math.max(landmarks[234].x, landmarks[454].x) + 0.1) * width));
+        const top = Math.max(0, Math.floor((landmarks[10].y - 0.22) * height));
+        const bottom = Math.min(height - 1, Math.ceil((landmarks[10].y + 0.1) * height));
+        if (right <= left || bottom <= top) {
+          return { volume: 'medium', volumeLabel: '中等', texture: 'soft', textureLabel: '柔顺' };
+        }
+        const image = captureCtx.getImageData(left, top, right - left, bottom - top).data;
+        let dark = 0;
+        let total = 0;
+        let sum = 0;
+        let sumSq = 0;
+        for (let i = 0; i < image.length; i += 4) {
+          const luma = image[i] * 0.2126 + image[i + 1] * 0.7152 + image[i + 2] * 0.0722;
+          if (luma < 115) dark += 1;
+          sum += luma;
+          sumSq += luma * luma;
+          total += 1;
+        }
+        const darkRatio = dark / Math.max(1, total);
+        const mean = sum / Math.max(1, total);
+        const variance = sumSq / Math.max(1, total) - mean * mean;
+        const volume = darkRatio > 0.34 ? 'thick' : darkRatio < 0.16 ? 'thin' : 'medium';
+        const texture = variance > 1700 ? 'wavy' : mean > 145 ? 'soft' : 'straight';
+        return {
+          volume,
+          volumeLabel: volume === 'thick' ? '偏多' : volume === 'thin' ? '偏少' : '中等',
+          texture,
+          textureLabel: texture === 'wavy' ? '有纹理' : texture === 'straight' ? '偏直' : '柔顺'
+        };
+      }
+
+      function styleScore(style, analysis) {
+        let score = 0;
+        if (style.shapes.includes(analysis.faceShape.id)) score += 4;
+        if (style.volume.includes(analysis.hair.volume)) score += 1.4;
+        if (style.texture.includes(analysis.hair.texture)) score += 1;
+        if (style.asset) score += 0.35;
+        if (analysis.faceShape.id === 'round' && /侧分|锁骨|八字/.test(style.label)) score += 1.5;
+        if (analysis.faceShape.id === 'oblong' && /刘海|纹理|齐肩/.test(style.label)) score += 1.5;
+        if (analysis.faceShape.id === 'square' && /层次|侧分|锁骨/.test(style.label)) score += 1.3;
+        if (analysis.faceShape.id === 'heart' && /刘海|长|八字/.test(style.label)) score += 1.2;
+        if (analysis.hair.volume === 'thin' && /微卷|层次|锁骨/.test(style.label)) score += 0.9;
+        if (analysis.hair.volume === 'thick' && /低层次|中短|后梳/.test(style.label)) score += 0.7;
+        return score;
+      }
+
+      function recommendStyles(analysis) {
+        return styleCatalog
+          .map((style) => ({ style, score: styleScore(style, analysis) }))
+          .sort((a, b) => b.score - a.score)
+          .slice(0, TOTAL_TRYON_COUNT)
+          .map((item, index) => ({ ...item.style, rank: index + 1, score: item.score }));
+      }
+
+      function captureAnalysisFrame(maxWidth = 720) {
+        if (video.readyState < 2 || !video.videoWidth || !video.videoHeight) return '';
+        const scale = Math.min(1, maxWidth / video.videoWidth);
+        const width = Math.max(1, Math.round(video.videoWidth * scale));
+        const height = Math.max(1, Math.round(video.videoHeight * scale));
+        captureCanvas.width = width;
+        captureCanvas.height = height;
+        captureCtx.save();
+        captureCtx.clearRect(0, 0, width, height);
+        captureCtx.drawImage(video, 0, 0, width, height);
+        captureCtx.restore();
+        return captureCanvas.toDataURL('image/jpeg', 0.86);
+      }
+
+      function mapServerRecommendations(recommendations) {
+        const mapped = [];
+        (recommendations || []).forEach((item) => {
+          const fallback = styleCatalog.find((style) => style.id === item.id);
+          const id = item.id || `ai-style-${mapped.length + 1}`;
+          const label = item.label || fallback?.label || `推荐发型 ${mapped.length + 1}`;
+          if (mapped.some((style) => style.id === id || style.label === label)) return;
+          mapped.push({
+            ...(fallback || {}),
+            id,
+            label,
+            rank: mapped.length + 1,
+            reason: item.reason || fallback?.reason || '根据脸型、发量和风格匹配。',
+            vibe: item.vibe || fallback?.vibe || '推荐',
+            prompt: item.prompt || item.generationPrompt || fallback?.prompt || label,
+            genderPresentation: item.genderPresentation || fallback?.genderPresentation || ''
+          });
+        });
+        styleCatalog.forEach((style) => {
+          if (mapped.length >= TOTAL_TRYON_COUNT) return;
+          if (!mapped.some((candidate) => candidate.id === style.id)) {
+            mapped.push({ ...style, rank: mapped.length + 1 });
+          }
+        });
+        return mapped.slice(0, TOTAL_TRYON_COUNT);
+      }
+
+      async function requestAiRecommendation(metrics) {
+        const image = captureAnalysisFrame();
+        if (!image) throw new Error('摄像头画面尚未准备好');
+        lastRecommendationImage = image;
+        const response = await fetch('/api/hair-recommendation', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image, metrics, count: TOTAL_TRYON_COUNT })
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload.error || `推荐接口失败：HTTP ${response.status}`);
+        return payload;
+      }
+
+      function updateTryOnPanel() {
+        if (!recommendationVisible) return;
+        const style = hairStyles[currentStyle];
+        if (!style || !style.tryonImage) {
+          if (!tryOnBusy) {
+            tryonPanel.hidden = true;
+            document.body.classList.remove('tryon-ready');
+          }
+          return;
+        }
+        tryonImage.src = style.tryonImage;
+        tryonImage.hidden = false;
+        tryonLoading.hidden = true;
+        tryonCaption.innerHTML = `<strong>${style.rank || currentStyle + 1}. ${style.label}</strong><span>${style.reason || 'AI 已生成该款高清试戴图。'}</span>`;
+        tryonPanel.hidden = false;
+        document.body.classList.add('tryon-ready');
+      }
+
+      function showTryOnLoading(done = 0, total = 5) {
+        document.body.classList.add('tryon-ready');
+        tryonPanel.hidden = false;
+        tryonImage.hidden = true;
+        tryonLoading.hidden = false;
+        tryonCaption.innerHTML = `<strong>正在生成高清试戴图</strong><span>已完成 ${done}/${total} 款。生成中请保持页面打开，完成后自动显示。</span>`;
+      }
+
+      async function requestTryOnImages(image, recommendations, limit = recommendations.length) {
+        const response = await fetch('/api/hair-tryon', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image, recommendations, limit })
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload.error || `试戴图生成失败：HTTP ${response.status}`);
+        return payload;
+      }
+
+      async function generateTryOnImages(stylesToGenerate = hairStyles, options = {}) {
+        const reveal = options.reveal ?? recommendationVisible;
+        const pending = stylesToGenerate.filter((style) => style && !style.tryonImage);
+        if (tryOnBusy || !lastRecommendationImage || !pending.length) {
+          renderDock();
+          return;
+        }
+        tryOnBusy = true;
+        if (reveal && startAiRecommendButton) startAiRecommendButton.disabled = true;
+        renderDock();
+        if (reveal) {
+          showTryOnLoading(generatedStyleCount(), pending.length);
+          renderStyleButtons();
+          setStatus('正在生成高清试戴图', pending.length <= INITIAL_TRYON_COUNT ? '先生成 5 款，完成后可继续推荐更多。' : `正在补充 ${pending.length} 款更多发型。`);
+        }
+        let failed = 0;
+        try {
+          for (let i = 0; i < pending.length; i += 1) {
+            const style = pending[i];
+            const payload = await requestTryOnImages(lastRecommendationImage, [{
+              id: style.id,
+              label: style.label,
+              prompt: style.prompt,
+              reason: style.reason,
+              vibe: style.vibe,
+              genderPresentation: style.genderPresentation
+            }], 1);
+            const generated = (payload.variants || [])[0];
+            if (generated?.image) {
+              hairStyles = hairStyles.map((item) => item.id === style.id
+                ? { ...item, tryonImage: generated.image, reason: generated.reason || item.reason }
+                : item);
+              if (!hairStyles[currentStyle]?.tryonImage) {
+                const generatedIndex = hairStyles.findIndex((item) => item.id === style.id);
+                if (generatedIndex >= 0) currentStyle = generatedIndex;
+              }
+            } else {
+              failed += 1;
+              hairStyles = hairStyles.map((item) => item.id === style.id
+                ? { ...item, tryonError: generated?.error || item.tryonError || '生成失败' }
+                : item);
+            }
+            renderStyleButtons();
+            if (reveal) {
+              updateTryOnPanel();
+              const active = hairStyles[currentStyle];
+              if (active?.tryonImage) {
+                tryonCaption.innerHTML = `<strong>${active.rank || currentStyle + 1}. ${active.label}</strong><span>${active.reason || 'AI 已生成该款高清试戴图。'} · 已生成 ${generatedStyleCount()}/${hairStyles.length} 款，剩余生成中。</span>`;
+              }
+              setStatus('高清试戴图生成中', `已生成 ${generatedStyleCount()} 款${failed ? ` · ${failed} 款失败` : ''}`);
+            }
+          }
+          if (!generatedStyleCount()) {
+            tryonPanel.hidden = false;
+            tryonImage.hidden = true;
+            tryonLoading.hidden = true;
+            document.body.classList.remove('tryon-ready');
+            tryonCaption.innerHTML = `<strong>高清试戴图生成失败</strong><span>生成服务返回失败，请稍后重试。</span>`;
+          }
+          if (reveal) setStatus('高清试戴图已生成', `已生成 ${generatedStyleCount()} 款${failed ? ` · ${failed} 款失败` : ''} · ${currentStyleLabel()}`);
+        } catch (err) {
+          if (reveal) {
+            tryonPanel.hidden = false;
+            tryonImage.hidden = true;
+            tryonLoading.hidden = true;
+            document.body.classList.remove('tryon-ready');
+            tryonCaption.innerHTML = `<strong>高清试戴图生成失败</strong><span>${err.message || String(err)}</span>`;
+            setStatus('高清试戴图生成失败', err.message || String(err), true);
+          }
+          throw err;
+        } finally {
+          tryOnBusy = false;
+          if (reveal && startAiRecommendButton) startAiRecommendButton.disabled = false;
+          renderDock();
+        }
+      }
+
+      function renderAnalysis() {
+        const result = analysisResult;
+        if (!result) return;
+        const leadStyle = hairStyles[0];
+        analysisGrid.innerHTML = `
+          <div class="analysis-item"><span>脸型</span><b>${result.faceShape.label}</b></div>
+          <div class="analysis-item"><span>性别风格</span><b>${result.genderLabel || '综合'}</b></div>
+          <div class="analysis-item"><span>发质</span><b>${result.hair.textureLabel}</b></div>
+          <div class="analysis-item"><span>风格</span><b>${leadStyle?.vibe || '推荐中'}</b></div>
+        `;
+        const provider = result.provider || '';
+        const source = provider.includes('fallback') ? '备用规则' : provider && !provider.startsWith('local') ? 'Gemini AI 顾问' : '本地规则';
+        const summary = result.summary ? `${result.summary} ` : '';
+        const remaining = Math.max(0, TOTAL_TRYON_COUNT - hairStyles.length);
+        analysisNote.textContent = hairStyles.length
+          ? remaining
+            ? `${source}：${summary}已生成 ${hairStyles.length} 款，点击「推荐更多」可补充 ${remaining} 款。打响指切换。`
+            : `${source}：${summary}已生成全部推荐，打响指切换。`
+          : '正在生成专属推荐，请稍候。';
+      }
+
+      function defaultAnalysis() {
+        return {
+          faceShape: { id: 'oval', label: '鹅蛋脸' },
+          hair: { volume: 'medium', volumeLabel: '中等', texture: 'soft', textureLabel: '柔顺' },
+          genderPresentation: 'uncertain',
+          genderLabel: '综合'
+        };
+      }
+
+      async function analyzeAndRecommend(landmarks = null, options = {}) {
+        const reveal = options.reveal ?? recommendationVisible;
+        if (recommendationBusy) return;
+        recommendationBusy = true;
+        prewarmFailed = '';
+        if (reveal && startAiRecommendButton) startAiRecommendButton.disabled = true;
+        if (reveal) showTryOnLoading(0, INITIAL_TRYON_COUNT);
+        const fallback = defaultAnalysis();
+        const faceShape = landmarks ? classifyFaceShape(landmarks) : fallback.faceShape;
+        const hair = landmarks ? sampleHairProfile(landmarks) : fallback.hair;
+        const localAnalysis = { faceShape, hair };
+        analysisResult = { ...localAnalysis, provider: 'local' };
+        hairStyles = [];
+        allRecommendations = [];
+        currentStyle = 0;
+        smoothedTarget = null;
+        analysisLocked = true;
+        renderStyleButtons();
+        if (reveal) {
+          renderAnalysis();
+          setStatus('正在生成推荐', `${faceShape.label} · 发量${hair.volumeLabel} · 发质${hair.textureLabel}`);
+        }
+        try {
+          const serverResult = await requestAiRecommendation(localAnalysis);
+          analysisResult = {
+            faceShape: serverResult.analysis?.faceShape || faceShape,
+            hair: serverResult.analysis?.hair || hair,
+            genderPresentation: serverResult.analysis?.genderPresentation || 'uncertain',
+            genderLabel: serverResult.analysis?.genderLabel || '综合',
+            provider: serverResult.provider,
+            summary: serverResult.analysis?.summary || '',
+            warning: serverResult.warning || ''
+          };
+          allRecommendations = mapServerRecommendations(serverResult.recommendations).slice(0, TOTAL_TRYON_COUNT);
+          hairStyles = allRecommendations.slice(0, INITIAL_TRYON_COUNT);
+          currentStyle = 0;
+          smoothedTarget = null;
+          renderStyleButtons();
+          if (reveal) {
+            renderAnalysis();
+            setStatus(serverResult.provider?.includes('fallback') ? '推荐已生成' : 'AI 推荐已生成', `${analysisResult.faceShape.label} · ${analysisResult.hair.volumeLabel} · ${currentStyleLabel()}`);
+          }
+          await generateTryOnImages(hairStyles, { reveal });
+        } catch (err) {
+          analysisResult = { ...localAnalysis, provider: 'local', warning: err.message || String(err) };
+          allRecommendations = recommendStyles(localAnalysis).slice(0, TOTAL_TRYON_COUNT);
+          hairStyles = allRecommendations.slice(0, INITIAL_TRYON_COUNT);
+          currentStyle = 0;
+          renderStyleButtons();
+          if (reveal) {
+            renderAnalysis();
+            setStatus('推荐已生成', `接口暂不可用，已使用本地规则 · ${currentStyleLabel()}`);
+          }
+          await generateTryOnImages(hairStyles, { reveal });
+        } finally {
+          recommendationBusy = false;
+          if (reveal && startAiRecommendButton) startAiRecommendButton.disabled = false;
+          renderDock();
+        }
+      }
+
+      function buildHairTarget(landmarks, rect, targetW, targetH) {
+        if (!landmarks || landmarks.length < 455) return null;
+        const style = hairStyles[currentStyle];
+        const fit = style.fit || {};
+        const leftEye = pointFromLandmark(landmarks[33], rect);
+        const rightEye = pointFromLandmark(landmarks[263], rect);
+        const forehead = pointFromLandmark(landmarks[10], rect);
+        const chin = pointFromLandmark(landmarks[152], rect);
+        const leftCheek = pointFromLandmark(landmarks[234], rect);
+        const rightCheek = pointFromLandmark(landmarks[454], rect);
+        const eyeA = leftEye.x < rightEye.x ? leftEye : rightEye;
+        const eyeB = leftEye.x < rightEye.x ? rightEye : leftEye;
+        const eyeDist = distance(leftEye, rightEye);
+        const cheekDist = distance(leftCheek, rightCheek);
+        const faceHeight = distance(forehead, chin);
+        if (!eyeDist || !cheekDist || !faceHeight) return null;
+
+        const cx = (leftCheek.x + rightCheek.x) * 0.5;
+        const hairW = clamp(Math.max(cheekDist * (fit.width || 1.9), eyeDist * 4.1), targetW * 0.24, targetW * 0.94);
+        const hairH = clamp(faceHeight * (fit.height || 1.22), hairW * 0.68, hairW * 1.42);
+        const top = forehead.y + faceHeight * (fit.top || -0.42);
+        return {
+          cx,
+          cy: top + hairH * 0.5,
+          w: hairW,
+          h: hairH,
+          angle: clamp(Math.atan2(eyeB.y - eyeA.y, eyeB.x - eyeA.x), -0.42, 0.42),
+          alpha: 0.98,
+          faceMask: {
+            x: 0,
+            y: hairH * (fit.faceCy || 0.17),
+            rx: hairW * (fit.faceRx || 0.29),
+            ry: hairH * (fit.faceRy || 0.42)
+          },
+          live: true
+        };
+      }
+
+      function fallbackHairTarget(targetW, targetH) {
+        const size = Math.min(targetW * 0.64, targetH * 0.55);
+        return {
+          cx: targetW * 0.5,
+          cy: targetH * 0.28,
+          w: size,
+          h: size * 0.86,
+          angle: 0,
+          alpha: 0.62,
+          faceMask: {
+            x: 0,
+            y: size * 0.12,
+            rx: size * 0.28,
+            ry: size * 0.36
+          },
+          live: false
+        };
+      }
+
+      function smoothTarget(target) {
+        if (!target) return smoothedTarget;
+        if (!smoothedTarget || smoothedTarget.live !== target.live) {
+          smoothedTarget = { ...target };
+          return smoothedTarget;
+        }
+        const a = target.live ? 0.34 : 0.18;
+        smoothedTarget.cx += (target.cx - smoothedTarget.cx) * a;
+        smoothedTarget.cy += (target.cy - smoothedTarget.cy) * a;
+        smoothedTarget.w += (target.w - smoothedTarget.w) * a;
+        smoothedTarget.h += (target.h - smoothedTarget.h) * a;
+        smoothedTarget.angle += (target.angle - smoothedTarget.angle) * a;
+        smoothedTarget.alpha += (target.alpha - smoothedTarget.alpha) * a;
+        if (target.faceMask && smoothedTarget.faceMask) {
+          smoothedTarget.faceMask.x += (target.faceMask.x - smoothedTarget.faceMask.x) * a;
+          smoothedTarget.faceMask.y += (target.faceMask.y - smoothedTarget.faceMask.y) * a;
+          smoothedTarget.faceMask.rx += (target.faceMask.rx - smoothedTarget.faceMask.rx) * a;
+          smoothedTarget.faceMask.ry += (target.faceMask.ry - smoothedTarget.faceMask.ry) * a;
+        } else {
+          smoothedTarget.faceMask = target.faceMask ? { ...target.faceMask } : null;
+        }
+        smoothedTarget.live = target.live;
+        return smoothedTarget;
+      }
+
+      function updateTrackingStatus(live) {
+        if (!hairStyles.length) return;
+        if (performance.now() < statusHoldUntil) return;
+        const nextState = live ? 'locked' : 'searching';
+        if (trackingState === nextState) return;
+        trackingState = nextState;
+        setStatus('实时发型试戴', live
+          ? `已锁定头部 · ${currentStyleLabel()}`
+          : `请把脸放进画面 · 正在预览 ${currentStyleLabel()}`);
+      }
+
+      function triggerSnapSwitch() {
+        if (!recommendationVisible || generatedStyleCount() < 1) return false;
+        if (tryOnBusy || recommendationBusy) {
+          if (performance.now() - statusHoldUntil > 600) {
+            statusHoldUntil = performance.now() + 900;
+            setStatus('正在生成高清试戴图', '第一张发型图完成后再打响指切换。');
+          }
+          return false;
+        }
+        const generatedIndexes = hairStyles
+          .map((style, index) => style.tryonImage ? index : -1)
+          .filter((index) => index >= 0);
+        if (generatedIndexes.length < 2) {
+          if (hairStyles.length && performance.now() - statusHoldUntil > 600) {
+            statusHoldUntil = performance.now() + 900;
+            setStatus('试戴图生成中', '至少生成 2 款后再打响指切换。');
+          }
+          return false;
+        }
+        const currentGeneratedPosition = generatedIndexes.indexOf(currentStyle);
+        const nextGeneratedIndex = generatedIndexes[(currentGeneratedPosition + 1 + generatedIndexes.length) % generatedIndexes.length];
+        playSnapEffect();
+        setStyle(nextGeneratedIndex, 'snap');
+        return true;
+      }
+
+      function playSnapEffect() {
+        flash.classList.remove('pop');
+        snapBurst.classList.remove('pop');
+        void snapBurst.offsetWidth;
+        flash.classList.add('pop');
+        snapBurst.classList.add('pop');
+      }
+
+      function nowSafe() {
+        return performance.now();
+      }
+
+      function onHands(results) {
+        const hand = results.multiHandLandmarks && results.multiHandLandmarks[0];
+        const now = performance.now();
+        if (!hand) {
+          if (now - snapPrimeAt > 800) snapPrimed = false;
+          lastSnapDistance = 1;
+          lastMiddleTip = null;
+          lastPinchClosed = false;
+          return;
+        }
+        const thumbTip = hand[4];
+        const indexTip = hand[8];
+        const middleTip = hand[12];
+        const wrist = hand[0];
+        const indexBase = hand[5];
+        const middleBase = hand[9];
+        const pinkyBase = hand[17];
+        const palmScale = Math.max(
+          0.035,
+          Math.hypot(wrist.x - middleBase.x, wrist.y - middleBase.y),
+          Math.hypot(indexBase.x - pinkyBase.x, indexBase.y - pinkyBase.y) * 1.15
+        );
+        const middlePinch = Math.hypot(thumbTip.x - middleTip.x, thumbTip.y - middleTip.y) / palmScale;
+        const indexPinch = Math.hypot(thumbTip.x - indexTip.x, thumbTip.y - indexTip.y) / palmScale;
+        const snapDistance = Math.min(middlePinch, indexPinch * 1.12);
+        const fingerPinched = snapDistance < 0.98;
+        const fingerOpened = snapDistance > 1.2;
+        if (fingerPinched) {
+          snapPrimed = true;
+          snapPrimeAt = now;
+        }
+        if (snapPrimed && fingerOpened && now - snapPrimeAt < 1400 && now - lastSnapAt > 900) {
+          const triggered = triggerSnapSwitch();
+          if (triggered) lastSnapAt = now;
+          snapPrimed = false;
+        }
+        if (now - snapPrimeAt > 1400) snapPrimed = false;
+        lastPinchClosed = fingerPinched;
+        lastSnapDistance = snapDistance;
+        lastMiddleTip = { x: middleTip.x, y: middleTip.y };
+      }
+
+      function resolveHairTarget(rect, targetW, targetH) {
+        const live = lastLandmarks && performance.now() - lastTrackAt < 900;
+        const target = live
+          ? buildHairTarget(lastLandmarks, rect, targetW, targetH)
+          : fallbackHairTarget(targetW, targetH);
+        const resolved = smoothTarget(target || fallbackHairTarget(targetW, targetH));
+        updateTrackingStatus(!!resolved.live);
+        return resolved;
+      }
+
+      function drawHairOverlay(ctx, target) {
+        const image = hairImages.get(hairStyles[currentStyle].id);
+        if (!image || !target) return;
+        const hairX = -target.w * 0.5;
+        const hairY = -target.h * 0.5;
+
+        ctx.save();
+        ctx.translate(target.cx, target.cy);
+        ctx.rotate(target.angle);
+        ctx.globalAlpha = target.alpha * 0.22;
+        ctx.filter = `blur(${Math.max(3, target.w * 0.012)}px)`;
+        ctx.globalCompositeOperation = 'multiply';
+        ctx.drawImage(image, hairX + target.w * 0.025, hairY + target.h * 0.05, target.w, target.h);
+        ctx.restore();
+
+        ctx.save();
+        ctx.translate(target.cx, target.cy);
+        ctx.rotate(target.angle);
+        ctx.globalAlpha = target.alpha;
+        ctx.drawImage(image, hairX, hairY, target.w, target.h);
+        if (target.faceMask) {
+          ctx.globalCompositeOperation = 'destination-out';
+          const mask = target.faceMask;
+          const feather = Math.max(6, Math.min(target.w, target.h) * 0.018);
+          ctx.filter = `blur(${feather}px)`;
+          ctx.beginPath();
+          ctx.ellipse(mask.x, mask.y, mask.rx, mask.ry, 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+      }
+
+      function renderOverlay() {
+        resizeOverlay();
+        const w = overlay.width;
+        const h = overlay.height;
+        overlayCtx.clearRect(0, 0, w, h);
+        renderId = requestAnimationFrame(renderOverlay);
+      }
+
+      function renderStyleButtons() {
+        stylebar.innerHTML = '';
+        const visibleStyles = hairStyles.length ? hairStyles : (recommendationVisible ? allRecommendations.slice(0, INITIAL_TRYON_COUNT) : []);
+        if (!recommendationVisible || !visibleStyles.length) {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'style-empty';
+          button.disabled = recommendationVisible && (recommendationBusy || tryOnBusy);
+          button.textContent = recommendationVisible && (recommendationBusy || tryOnBusy) ? '正在生成专属推荐...' : '开始 AI 推荐';
+          button.addEventListener('click', startAiRecommendation);
+          startAiRecommendButton = button;
+          stylebar.appendChild(button);
+          renderDock();
+          return;
+        }
+        startAiRecommendButton = null;
+        visibleStyles.forEach((style, index) => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = `style-button${index === currentStyle ? ' active' : ''}`;
+          const state = style.tryonImage ? ' ✓' : style.tryonError ? ' !' : ' · 生成中';
+          button.textContent = `${style.rank ? `${style.rank}. ` : ''}${style.label}${state}`;
+          button.addEventListener('click', () => setStyle(index));
+          stylebar.appendChild(button);
+        });
+        renderDock();
+      }
+
+      function setStyle(index, reason = 'tap') {
+        if (tryOnBusy || recommendationBusy) return;
+        if (!hairStyles.length) return;
+        currentStyle = (index + hairStyles.length) % hairStyles.length;
+        renderStyleButtons();
+        renderAnalysis();
+        updateTryOnPanel();
+        renderDock();
+        trackingState = '';
+        statusHoldUntil = reason === 'snap' ? performance.now() + 900 : 0;
+        setStatus('实时发型试戴', reason === 'snap'
+          ? `响指切换 · 推荐 ${currentStyle + 1}/${hairStyles.length} · ${currentStyleLabel()}`
+          : `${activeFacingMode === 'user' ? '前' : '后'}摄像头已开启 · 推荐 ${currentStyle + 1}/${hairStyles.length} · ${currentStyleLabel()}`);
+      }
+
+      function resetRecommendationState() {
+        analysisLocked = false;
+        analysisResult = null;
+        recommendationVisible = false;
+        prewarmPromise = null;
+        prewarmFailed = '';
+        recommendationBusy = false;
+        tryOnBusy = false;
+        lastRecommendationImage = '';
+        hairStyles = [];
+        allRecommendations = [];
+        currentStyle = 0;
+        tryonPanel.hidden = true;
+        tryonImage.hidden = true;
+        tryonLoading.hidden = true;
+        document.body.classList.remove('tryon-ready');
+        renderStyleButtons();
+        renderDock();
+        analysisGrid.innerHTML = `
+          <div class="analysis-item"><span>脸型</span><b>等待识别</b></div>
+          <div class="analysis-item"><span>发量</span><b>等待识别</b></div>
+          <div class="analysis-item"><span>发质</span><b>等待识别</b></div>
+          <div class="analysis-item"><span>风格</span><b>推荐中</b></div>
+        `;
+        analysisNote.textContent = '点击下方按钮开始 AI 推荐。';
+      }
+
+      function startAiRecommendation() {
+        recommendationVisible = true;
+        analysisLocked = false;
+        if (prewarmFailed && !hairStyles.length) prewarmPromise = null;
+        renderStyleButtons();
+        renderAnalysis();
+        if (hairStyles.some((style) => style.tryonImage)) {
+          updateTryOnPanel();
+          setStatus('AI 推荐已准备好', `已生成 ${generatedStyleCount()} 款 · ${currentStyleLabel()}`);
+          renderDock();
+          return;
+        }
+        if (prewarmPromise || recommendationBusy || tryOnBusy) {
+          showTryOnLoading(generatedStyleCount(), INITIAL_TRYON_COUNT);
+          setStatus('正在生成高清试戴图', '已提前开始生成，完成后自动显示。');
+          prewarmPromise?.then(() => {
+            if (!recommendationVisible) return;
+            renderStyleButtons();
+            renderAnalysis();
+            updateTryOnPanel();
+            if (hairStyles.some((style) => style.tryonImage)) {
+              setStatus('AI 推荐已准备好', `已生成 ${generatedStyleCount()} 款 · ${currentStyleLabel()}`);
+            } else if (prewarmFailed) {
+              setStatus('推荐失败', prewarmFailed, true);
+            } else {
+              setStatus('高清试戴图生成失败', '没有返回可展示图片，请点击重新推荐。', true);
+            }
+            renderDock();
+          });
+          return;
+        }
+        prewarmPromise = analyzeAndRecommend(lastLandmarks, { reveal: true }).catch((err) => {
+          recommendationBusy = false;
+          prewarmFailed = err.message || String(err);
+          if (startAiRecommendButton) startAiRecommendButton.disabled = false;
+          renderDock();
+          setStatus('推荐失败', err.message || String(err), true);
+        });
+      }
+
+      async function recommendMoreOrRestart() {
+        if (recommendationBusy || tryOnBusy) return;
+        const nextBatch = remainingRecommendations().slice(0, Math.min(MORE_TRYON_COUNT, TOTAL_TRYON_COUNT - hairStyles.length));
+        if (!nextBatch.length) {
+          showToast('您的今日生成次数已达上限，请明天再来试试吧');
+          return;
+        }
+        const startIndex = hairStyles.length;
+        hairStyles = hairStyles.concat(nextBatch.map((style, index) => ({
+          ...style,
+          rank: startIndex + index + 1
+        })));
+        renderStyleButtons();
+        renderAnalysis();
+        setStatus('正在补充更多推荐', `继续生成 ${nextBatch.length} 款新发型。`);
+        try {
+          await generateTryOnImages(nextBatch);
+        } catch (err) {
+          setStatus('补充推荐失败', err.message || String(err), true);
+        }
+      }
+
+      recommendMoreButton.addEventListener('click', recommendMoreOrRestart);
+      saveShotButton.addEventListener('click', saveCurrentTryOn);
+      prevStyleButton.addEventListener('click', () => setStyle(currentStyle - 1));
+      nextStyleButton.addEventListener('click', () => setStyle(currentStyle + 1));
+      enableCameraButton.addEventListener('click', async () => {
+        setStatus('正在启用摄像头', '请在弹窗中允许摄像头访问');
+        try {
+          await startCamera(activeFacingMode || facingMode);
+          if (!loopId) loopId = requestAnimationFrame(visionLoop);
+        } catch (err) {
+          showError('启用摄像头失败', err);
+          showCameraPrompt('Codex 内置浏览器可能没有 macOS 摄像头权限入口；建议用 Google Chrome 打开同一地址测试摄像头。');
+        }
+      });
+      switchCameraButton.addEventListener('click', async () => {
+        if (switchingCamera) return;
+        switchingCamera = true;
+        const nextFacing = activeFacingMode === 'user' ? 'environment' : 'user';
+        smoothedTarget = null;
+        lastLandmarks = null;
+        analysisLocked = false;
+        analysisResult = null;
+        recommendationVisible = false;
+        prewarmPromise = null;
+        prewarmFailed = '';
+        recommendationBusy = false;
+        tryOnBusy = false;
+        lastRecommendationImage = '';
+        hairStyles = [];
+        allRecommendations = [];
+        currentStyle = 0;
+        tryonPanel.hidden = true;
+        renderStyleButtons();
+        trackingState = '';
+        setStatus('正在切换摄像头', nextFacing === 'user' ? '尝试打开前摄像头' : '尝试打开后摄像头');
+        try {
+          await startCamera(nextFacing, { preferNextDevice: true });
+        } catch (err) {
+          showError('切换摄像头失败', err);
+          showCameraPrompt('摄像头切换被拒绝或设备不可用，可以先重新启用摄像头。');
+        } finally {
+          switchingCamera = false;
+        }
+      });
+
+      window.addEventListener('resize', resizeOverlay, { passive: true });
+      window.addEventListener('pagehide', () => {
+        cancelAnimationFrame(loopId);
+        cancelAnimationFrame(renderId);
+        if (stream) stream.getTracks().forEach((track) => track.stop());
+      });
+
+      async function main() {
+        try {
+          renderStyleButtons();
+          if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            throw new Error('当前浏览器不支持摄像头 API');
+          }
+          await Promise.all([loadHairAssets(), setupVision()]);
+          renderId = requestAnimationFrame(renderOverlay);
+          await startCamera();
+          loopId = requestAnimationFrame(visionLoop);
+        } catch (err) {
+          showError('启动失败', err);
+          showCameraPrompt('Codex 内置浏览器可能不会出现在系统摄像头权限列表；建议用 Google Chrome 打开 http://127.0.0.1:8000/ 测试。');
+        }
+      }
+
+      main();
+    })();
+  </script>
+</body>
+</html>

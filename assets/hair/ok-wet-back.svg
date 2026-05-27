@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="720" viewBox="0 0 720 720">
+  <defs>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="4"/>
+      <feOffset dy="6"/>
+      <feComponentTransfer><feFuncA type="linear" slope=".28"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <style>
+      :root { --hair: #171615; }
+      .shine { fill: none; stroke: rgba(255,255,255,.22); stroke-width: 8; stroke-linecap: round; }
+      .thick { stroke-width: 14; opacity: .5; }
+    </style>
+  </defs>
+  <g filter="url(#soft)">
+    
+      <path fill="var(--hair)" d="M170 218 C190 82 490 72 554 214 C500 252 252 258 170 218Z"/>
+      <path class="shine" d="M256 102 C302 154 306 198 270 238"/>
+      <path class="shine" d="M348 92 C386 150 384 198 334 240"/>
+      <path class="shine" d="M442 112 C462 152 454 200 404 238"/>
+    
+  </g>
+  <metadata>微湿背头</metadata>
+</svg>

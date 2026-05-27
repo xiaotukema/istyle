@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="720" viewBox="0 0 720 720">
+  <defs>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="4"/>
+      <feOffset dy="6"/>
+      <feComponentTransfer><feFuncA type="linear" slope=".28"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <style>
+      :root { --hair: #34231f; }
+      .shine { fill: none; stroke: rgba(255,255,255,.22); stroke-width: 8; stroke-linecap: round; }
+      .thick { stroke-width: 14; opacity: .5; }
+    </style>
+  </defs>
+  <g filter="url(#soft)">
+    
+    <path fill="var(--hair)" d="
+      M208.8 238
+      C110 70 610 64 431.2 238
+      C650 471.6 500 608.4000000000001 360 596.4000000000001
+      C220 608.4000000000001 70 471.6 208.8 238 Z"/>
+    
+    <path fill="var(--hair)" d="M232 162 C270 108 386 90 484 154 C442 188 386 206 308 202 C270 198 245 184 232 162Z"/>
+    <path class="shine" d="M304 126 C326 158 316 186 300 214"/>
+    <path class="shine" d="M382 118 C378 154 394 184 380 222"/>
+  
+    
+    <path class="shine" d="M258 105 C240 190 238 280 214 365"/>
+    <path class="shine" d="M360 94 C342 188 360 276 328 372"/>
+    <path class="shine" d="M458 110 C492 195 478 290 512 384"/>
+  
+    
+    
+    
+  
+  </g>
+  <metadata>空气刘海长卷</metadata>
+</svg>

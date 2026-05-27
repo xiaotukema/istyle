@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="720" viewBox="0 0 720 720">
+  <defs>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="4"/>
+      <feOffset dy="6"/>
+      <feComponentTransfer><feFuncA type="linear" slope=".28"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <style>
+      :root { --hair: #3a231b; }
+      .shine { fill: none; stroke: rgba(255,255,255,.22); stroke-width: 8; stroke-linecap: round; }
+      .thick { stroke-width: 14; opacity: .5; }
+    </style>
+  </defs>
+  <g filter="url(#soft)">
+    <ellipse fill="var(--hair)" cx="150" cy="156" rx="54" ry="62" transform="rotate(-24 150 156)"/><ellipse fill="var(--hair)" cx="234" cy="156" rx="54" ry="62" transform="rotate(-12 234 156)"/><ellipse fill="var(--hair)" cx="294" cy="156" rx="54" ry="62" transform="rotate(0 294 156)"/><ellipse fill="var(--hair)" cx="378" cy="156" rx="54" ry="62" transform="rotate(12 378 156)"/><ellipse fill="var(--hair)" cx="438" cy="156" rx="54" ry="62" transform="rotate(24 438 156)"/><ellipse fill="var(--hair)" cx="522" cy="156" rx="54" ry="62" transform="rotate(-24 522 156)"/><ellipse fill="var(--hair)" cx="582" cy="156" rx="54" ry="62" transform="rotate(-12 582 156)"/><ellipse fill="var(--hair)" cx="162" cy="248" rx="54" ry="62" transform="rotate(0 162 248)"/><ellipse fill="var(--hair)" cx="222" cy="248" rx="54" ry="62" transform="rotate(12 222 248)"/><ellipse fill="var(--hair)" cx="306" cy="248" rx="54" ry="62" transform="rotate(24 306 248)"/><ellipse fill="var(--hair)" cx="366" cy="248" rx="54" ry="62" transform="rotate(-24 366 248)"/><ellipse fill="var(--hair)" cx="450" cy="248" rx="54" ry="62" transform="rotate(-12 450 248)"/><ellipse fill="var(--hair)" cx="510" cy="248" rx="54" ry="62" transform="rotate(0 510 248)"/><ellipse fill="var(--hair)" cx="594" cy="248" rx="54" ry="62" transform="rotate(12 594 248)"/><ellipse fill="var(--hair)" cx="150" cy="340" rx="54" ry="62" transform="rotate(24 150 340)"/><ellipse fill="var(--hair)" cx="234" cy="340" rx="54" ry="62" transform="rotate(-24 234 340)"/><ellipse fill="var(--hair)" cx="294" cy="340" rx="54" ry="62" transform="rotate(-12 294 340)"/><ellipse fill="var(--hair)" cx="378" cy="340" rx="54" ry="62" transform="rotate(0 378 340)"/><ellipse fill="var(--hair)" cx="438" cy="340" rx="54" ry="62" transform="rotate(12 438 340)"/><ellipse fill="var(--hair)" cx="522" cy="340" rx="54" ry="62" transform="rotate(24 522 340)"/><ellipse fill="var(--hair)" cx="582" cy="340" rx="54" ry="62" transform="rotate(-24 582 340)"/><ellipse fill="var(--hair)" cx="162" cy="432" rx="54" ry="62" transform="rotate(-12 162 432)"/>
+    <path class="shine" d="M258 105 C240 190 238 280 214 365"/>
+    <path class="shine" d="M360 94 C342 188 360 276 328 372"/>
+    <path class="shine" d="M458 110 C492 195 478 290 512 384"/>
+  
+  </g>
+  <metadata>宽蓬爆卷</metadata>
+</svg>

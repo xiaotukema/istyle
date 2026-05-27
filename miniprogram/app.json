@@ -1,0 +1,16 @@
+{
+  "pages": [
+    "pages/index/index"
+  ],
+  "window": {
+    "navigationBarTitleText": "iStyle 发型试戴",
+    "navigationBarBackgroundColor": "#0a0c0f",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#050608"
+  },
+  "permission": {
+    "scope.camera": {
+      "desc": "用于拍摄头像并生成发型试戴效果"
+    }
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "page": "aesthetic-snap",
+  "analysisProvider": "gemini",
+  "analysisModel": "gemini-2.5-flash",
+  "imageProvider": "gemini",
+  "geminiImageModel": "gemini-3-pro-image-preview",
+  "tryOnLimit": 3,
+  "tryOnConcurrency": 1
+}

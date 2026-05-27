@@ -1,0 +1,1825 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>专属美学形象鉴定</title>
+  <link rel="icon" href="data:," />
+  <style>
+    :root {
+      color-scheme: dark;
+      --ink: #0a0c0d;
+      --paper: #f4efe5;
+      --paper-2: #ded4c4;
+      --text: rgba(255, 252, 244, 0.94);
+      --muted: rgba(255, 252, 244, 0.64);
+      --line: rgba(255, 252, 244, 0.18);
+      --panel: rgba(11, 13, 14, 0.72);
+      --panel-strong: rgba(11, 13, 14, 0.9);
+      --emerald: #68c7a0;
+      --rose: #d78c8f;
+      --amber: #d7b56d;
+      --steel: #91a9b3;
+      --shadow: 0 24px 80px rgba(0, 0, 0, 0.46);
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html,
+    body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: var(--ink);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "PingFang TC", "Microsoft JhengHei", sans-serif;
+      letter-spacing: 0;
+    }
+
+    button {
+      border: 0;
+      font: inherit;
+      color: inherit;
+      cursor: pointer;
+    }
+
+    .camera,
+    .overlay,
+    .veil {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    .camera {
+      object-fit: cover;
+      background: #050606;
+      transition: left 420ms cubic-bezier(.2, .82, .2, 1), width 420ms cubic-bezier(.2, .82, .2, 1);
+    }
+
+    .camera.mirror {
+      transform: scaleX(-1);
+    }
+
+    .overlay {
+      pointer-events: none;
+    }
+
+    .veil {
+      pointer-events: none;
+      transition: left 420ms cubic-bezier(.2, .82, .2, 1), width 420ms cubic-bezier(.2, .82, .2, 1);
+      background:
+        linear-gradient(90deg, rgba(0, 0, 0, 0.58), rgba(0, 0, 0, 0.1) 42%, rgba(0, 0, 0, 0.64)),
+        linear-gradient(180deg, rgba(0, 0, 0, 0.42), transparent 45%, rgba(0, 0, 0, 0.62));
+    }
+
+    .topbar {
+      position: fixed;
+      top: max(16px, env(safe-area-inset-top));
+      left: 18px;
+      right: 18px;
+      z-index: 4;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+    }
+
+    .brand {
+      min-width: 0;
+      color: var(--text);
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: clamp(18px, 2.4vw, 28px);
+      line-height: 1.04;
+      font-weight: 760;
+      letter-spacing: 0;
+    }
+
+    .brand p {
+      margin: 6px 0 0;
+      max-width: 560px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(8, 10, 10, 0.48);
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.28);
+      backdrop-filter: blur(18px);
+    }
+
+    .icon-button {
+      display: grid;
+      width: 42px;
+      height: 42px;
+      place-items: center;
+      border-radius: 50%;
+      background: rgba(255, 252, 244, 0.1);
+      color: var(--text);
+      transition: transform 160ms ease, background 160ms ease;
+    }
+
+    .icon-button:hover {
+      background: rgba(255, 252, 244, 0.18);
+      transform: translateY(-1px);
+    }
+
+    .icon-button.primary {
+      background: var(--paper);
+      color: #111514;
+    }
+
+    .icon-button:disabled {
+      cursor: not-allowed;
+      opacity: 0.42;
+      transform: none;
+    }
+
+    .icon-button svg {
+      width: 20px;
+      height: 20px;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      fill: none;
+    }
+
+    .stage-copy {
+      position: fixed;
+      left: 24px;
+      bottom: max(24px, env(safe-area-inset-bottom));
+      z-index: 4;
+      display: grid;
+      gap: 12px;
+      max-width: min(420px, calc(100vw - 48px));
+      color: var(--text);
+    }
+
+    .signal {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: fit-content;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(8, 10, 10, 0.52);
+      backdrop-filter: blur(16px);
+      box-shadow: var(--shadow);
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .signal-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--steel);
+      box-shadow: 0 0 0 6px rgba(145, 169, 179, 0.14);
+    }
+
+    .signal.ready .signal-dot {
+      background: var(--emerald);
+      box-shadow: 0 0 0 6px rgba(104, 199, 160, 0.16);
+    }
+
+    .signal.busy .signal-dot {
+      background: var(--amber);
+      box-shadow: 0 0 0 6px rgba(215, 181, 109, 0.16);
+    }
+
+    .signal.error .signal-dot {
+      background: var(--rose);
+      box-shadow: 0 0 0 6px rgba(215, 140, 143, 0.16);
+    }
+
+    .capture-card {
+      display: none;
+      align-items: center;
+      gap: 12px;
+      width: fit-content;
+      max-width: 100%;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: rgba(8, 10, 10, 0.58);
+      backdrop-filter: blur(20px);
+      box-shadow: var(--shadow);
+    }
+
+    .capture-card.visible {
+      display: flex;
+    }
+
+    .capture-card img {
+      width: 74px;
+      height: 92px;
+      object-fit: cover;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 252, 244, 0.22);
+      background: #111;
+    }
+
+    .capture-card strong {
+      display: block;
+      color: var(--text);
+      font-size: 14px;
+      line-height: 1.25;
+    }
+
+    .capture-card span {
+      display: block;
+      margin-top: 5px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .report {
+      position: fixed;
+      top: max(92px, calc(env(safe-area-inset-top) + 78px));
+      right: 18px;
+      bottom: max(18px, env(safe-area-inset-bottom));
+      z-index: 5;
+      width: min(760px, calc(100vw - 36px));
+      overflow: hidden;
+      border: 1px solid rgba(244, 239, 229, 0.28);
+      border-radius: 28px;
+      background:
+        linear-gradient(145deg, rgba(244, 239, 229, 0.98), rgba(224, 215, 199, 0.96)),
+        var(--paper);
+      color: #141716;
+      box-shadow: var(--shadow);
+      transform: translateX(calc(100% + 28px));
+      transition: transform 420ms cubic-bezier(.2, .82, .2, 1);
+    }
+
+    .report.visible {
+      transform: translateX(0);
+    }
+
+    .report-scroll {
+      height: 100%;
+      overflow: auto;
+      padding: 22px;
+    }
+
+    .report-header {
+      display: grid;
+      grid-template-columns: 94px 1fr;
+      gap: 16px;
+      align-items: start;
+      padding-bottom: 18px;
+      border-bottom: 1px solid rgba(20, 23, 22, 0.16);
+    }
+
+    .tryon-stage {
+      display: grid;
+      grid-template-columns: minmax(260px, 1.12fr) minmax(220px, 0.88fr);
+      gap: 16px;
+      padding: 18px 0;
+      border-bottom: 1px solid rgba(20, 23, 22, 0.13);
+    }
+
+    .tryon-frame {
+      position: relative;
+      overflow: hidden;
+      min-height: 470px;
+      border-radius: 22px;
+      background:
+        linear-gradient(145deg, rgba(17, 21, 20, 0.92), rgba(36, 43, 39, 0.86)),
+        #111514;
+      box-shadow: 0 18px 42px rgba(20, 23, 22, 0.18);
+    }
+
+    .tryon-frame img {
+      width: 100%;
+      height: 100%;
+      min-height: 470px;
+      object-fit: cover;
+      display: block;
+    }
+
+    .tryon-frame img[hidden],
+    .tryon-frame img:not([src]) {
+      display: none;
+    }
+
+    .tryon-placeholder {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      color: rgba(244, 239, 229, 0.78);
+      font-size: 14px;
+      line-height: 1.55;
+      text-align: center;
+    }
+
+    .tryon-placeholder[hidden] {
+      display: none;
+    }
+
+    .tryon-badge {
+      position: absolute;
+      left: 14px;
+      top: 14px;
+      padding: 8px 10px;
+      border: 1px solid rgba(244, 239, 229, 0.22);
+      border-radius: 999px;
+      background: rgba(8, 10, 10, 0.56);
+      color: var(--paper);
+      font-size: 12px;
+      font-weight: 760;
+      backdrop-filter: blur(12px);
+    }
+
+    .tryon-copy {
+      display: grid;
+      align-content: start;
+      gap: 12px;
+    }
+
+    .tryon-copy h3 {
+      margin: 0;
+      color: #111514;
+      font-family: ui-serif, "Songti TC", "Noto Serif TC", Georgia, serif;
+      font-size: clamp(24px, 3vw, 34px);
+      line-height: 1;
+    }
+
+    .tryon-copy p {
+      margin: 0;
+      color: rgba(20, 23, 22, 0.74);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .tryon-tabs {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .tryon-tab {
+      padding: 10px 8px;
+      border: 1px solid rgba(20, 23, 22, 0.14);
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.24);
+      color: rgba(20, 23, 22, 0.72);
+      font-size: 12px;
+      font-weight: 780;
+      cursor: pointer;
+    }
+
+    .tryon-tab.active {
+      background: #111514;
+      color: var(--paper);
+    }
+
+    .tryon-note {
+      padding: 12px;
+      border-radius: 16px;
+      background: rgba(20, 23, 22, 0.07);
+      color: rgba(20, 23, 22, 0.74);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .portrait {
+      width: 94px;
+      aspect-ratio: 4 / 5;
+      border-radius: 18px;
+      overflow: hidden;
+      background: #191b19;
+      box-shadow: 0 14px 34px rgba(20, 23, 22, 0.2);
+    }
+
+    .portrait img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .report-kicker {
+      margin: 0 0 8px;
+      color: rgba(20, 23, 22, 0.58);
+      font-size: 11px;
+      font-weight: 760;
+      letter-spacing: 0;
+    }
+
+    .report h2 {
+      margin: 0;
+      color: #111514;
+      font-family: ui-serif, "Songti TC", "Noto Serif TC", Georgia, serif;
+      font-size: clamp(25px, 4vw, 36px);
+      line-height: 0.98;
+      letter-spacing: 0;
+    }
+
+    .report-subtitle {
+      margin: 10px 0 0;
+      color: rgba(20, 23, 22, 0.72);
+      font-size: 13px;
+      line-height: 1.48;
+    }
+
+    .section {
+      padding: 18px 0;
+      border-bottom: 1px solid rgba(20, 23, 22, 0.13);
+    }
+
+    .section:last-child {
+      border-bottom: 0;
+    }
+
+    .section h3 {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin: 0 0 12px;
+      color: #141716;
+      font-size: 14px;
+      font-weight: 840;
+    }
+
+    .section h3 span {
+      color: rgba(20, 23, 22, 0.48);
+      font-size: 11px;
+      font-weight: 760;
+    }
+
+    .summary {
+      margin: 0 0 14px;
+      color: rgba(20, 23, 22, 0.78);
+      font-size: 14px;
+      line-height: 1.62;
+    }
+
+    .chips,
+    .swatches {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .chip {
+      padding: 8px 10px;
+      border: 1px solid rgba(20, 23, 22, 0.14);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.32);
+      color: rgba(20, 23, 22, 0.82);
+      font-size: 12px;
+      font-weight: 720;
+    }
+
+    .swatch {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: calc(50% - 4px);
+      padding: 9px 10px;
+      border: 1px solid rgba(20, 23, 22, 0.13);
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.28);
+      color: rgba(20, 23, 22, 0.78);
+      font-size: 12px;
+      font-weight: 680;
+    }
+
+    .swatch i {
+      width: 14px;
+      height: 14px;
+      flex: 0 0 auto;
+      border-radius: 50%;
+      border: 1px solid rgba(20, 23, 22, 0.18);
+      background: var(--swatch, #d0c2ac);
+    }
+
+    .meta-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .meta {
+      padding: 12px;
+      border-radius: 16px;
+      background: rgba(20, 23, 22, 0.07);
+    }
+
+    .meta span {
+      display: block;
+      color: rgba(20, 23, 22, 0.48);
+      font-size: 11px;
+      font-weight: 760;
+    }
+
+    .meta strong {
+      display: block;
+      margin-top: 5px;
+      color: #141716;
+      font-size: 15px;
+    }
+
+    .list {
+      display: grid;
+      gap: 8px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .list li {
+      position: relative;
+      padding-left: 16px;
+      color: rgba(20, 23, 22, 0.78);
+      font-size: 13px;
+      line-height: 1.48;
+    }
+
+    .list li::before {
+      content: "";
+      position: absolute;
+      top: 0.62em;
+      left: 0;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--emerald);
+    }
+
+    .list strong,
+    .summary strong {
+      color: #101312;
+      font-weight: 860;
+    }
+
+    .message {
+      margin: 0;
+      padding: 16px;
+      border-radius: 18px;
+      background: #111514;
+      color: var(--paper);
+      font-family: ui-serif, "Songti TC", "Noto Serif TC", Georgia, serif;
+      font-size: 17px;
+      line-height: 1.5;
+    }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: max(22px, env(safe-area-inset-bottom));
+      z-index: 8;
+      max-width: min(420px, calc(100vw - 34px));
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: var(--panel-strong);
+      color: var(--text);
+      box-shadow: var(--shadow);
+      transform: translate(-50%, 16px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 180ms ease, transform 180ms ease;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    .toast.visible {
+      opacity: 1;
+      transform: translate(-50%, 0);
+    }
+
+    .flash {
+      position: fixed;
+      inset: 0;
+      z-index: 10;
+      pointer-events: none;
+      background: #fff;
+      opacity: 0;
+    }
+
+    .flash.pop {
+      animation: flash 420ms ease-out;
+    }
+
+    .snap-burst {
+      position: fixed;
+      left: 50%;
+      top: 44%;
+      z-index: 9;
+      width: min(54vw, 280px);
+      aspect-ratio: 1;
+      pointer-events: none;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0);
+      opacity: 0;
+      transform: translate(-50%, -50%) scale(0.3);
+      box-shadow:
+        0 0 0 0 rgba(104, 199, 160, 0),
+        inset 0 0 28px rgba(255, 255, 255, 0);
+    }
+
+    .snap-burst.pop {
+      animation: snapBurst 720ms cubic-bezier(.16, 1, .3, 1);
+    }
+
+    @keyframes flash {
+      0% { opacity: 0; }
+      15% { opacity: 0.78; }
+      100% { opacity: 0; }
+    }
+
+    @keyframes snapBurst {
+      0% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.25) rotate(-8deg);
+        border-color: rgba(104, 199, 160, 0);
+      }
+      18% {
+        opacity: 1;
+        border-color: rgba(255, 255, 255, 0.92);
+        box-shadow:
+          0 0 0 14px rgba(104, 199, 160, 0.24),
+          0 0 72px rgba(215, 181, 109, 0.46),
+          inset 0 0 36px rgba(255, 255, 255, 0.28);
+      }
+      100% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(1.45) rotate(8deg);
+        border-color: rgba(255, 255, 255, 0);
+        box-shadow:
+          0 0 0 62px rgba(104, 199, 160, 0),
+          0 0 96px rgba(215, 181, 109, 0),
+          inset 0 0 36px rgba(255, 255, 255, 0);
+      }
+    }
+
+    body.tryon-ready .report {
+      left: 0;
+      top: 0;
+      bottom: 0;
+      right: auto;
+      width: 50vw;
+      height: 100vh;
+      border-width: 0 1px 0 0;
+      border-radius: 0;
+      transform: none;
+    }
+
+    body.tryon-ready .report-scroll {
+      padding: max(22px, env(safe-area-inset-top)) 22px max(22px, env(safe-area-inset-bottom));
+    }
+
+    body.tryon-ready .tryon-stage {
+      grid-template-columns: 1fr;
+    }
+
+    body.tryon-ready .tryon-frame,
+    body.tryon-ready .tryon-frame img {
+      min-height: min(58vh, 640px);
+    }
+
+    body.tryon-ready .camera,
+    body.tryon-ready .veil,
+    body.tryon-ready .overlay {
+      left: 50vw;
+      width: 50vw;
+    }
+
+    body.tryon-ready .topbar {
+      left: 50vw;
+      right: 18px;
+    }
+
+    body.tryon-ready .brand {
+      display: none;
+    }
+
+    body.tryon-ready .stage-copy {
+      left: calc(50vw + 24px);
+    }
+
+    @media (max-width: 760px) {
+      .topbar {
+        align-items: flex-start;
+      }
+
+      .brand p {
+        display: none;
+      }
+
+      .toolbar {
+        gap: 6px;
+        padding: 6px;
+      }
+
+      .icon-button {
+        width: 40px;
+        height: 40px;
+      }
+
+      .report {
+        top: auto;
+        left: 10px;
+        right: 10px;
+        bottom: max(10px, env(safe-area-inset-bottom));
+        width: auto;
+        height: min(78vh, 720px);
+        border-radius: 24px;
+        transform: translateY(calc(100% + 24px));
+      }
+
+      .report.visible {
+        transform: translateY(0);
+      }
+
+      body.tryon-ready .report {
+        left: 0;
+        right: auto;
+        top: 0;
+        bottom: 0;
+        width: 50vw;
+        height: 100vh;
+        border-radius: 0;
+        transform: none;
+      }
+
+      body.tryon-ready .camera,
+      body.tryon-ready .veil,
+      body.tryon-ready .overlay {
+        left: 50vw;
+        width: 50vw;
+      }
+
+      body.tryon-ready .topbar {
+        left: calc(50vw + 8px);
+        right: 8px;
+      }
+
+      body.tryon-ready .toolbar {
+        transform: scale(0.82);
+        transform-origin: top right;
+      }
+
+      body.tryon-ready .stage-copy {
+        display: none;
+      }
+
+      .report-scroll {
+        padding: 18px;
+      }
+
+      .report-header {
+        grid-template-columns: 78px 1fr;
+        gap: 13px;
+      }
+
+      .tryon-stage {
+        grid-template-columns: 1fr;
+      }
+
+      .tryon-frame,
+      .tryon-frame img {
+        min-height: 56vh;
+      }
+
+      .portrait {
+        width: 78px;
+      }
+
+      .stage-copy {
+        left: 14px;
+        right: 14px;
+        bottom: max(14px, env(safe-area-inset-bottom));
+      }
+
+      .report.visible ~ .stage-copy {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <video id="camera" class="camera mirror" playsinline muted autoplay></video>
+  <canvas id="overlay" class="overlay" aria-hidden="true"></canvas>
+  <div class="veil" aria-hidden="true"></div>
+
+  <header class="topbar">
+    <div class="brand">
+      <h1>专属美学形象鉴定</h1>
+      <p>摄像头自动开启，也可上传高清自拍照；打响指生成并切换 3 套试穿图。</p>
+    </div>
+    <nav class="toolbar" aria-label="操作">
+      <button id="snapBtn" class="icon-button" type="button" aria-label="截取照片" disabled>
+        <svg viewBox="0 0 24 24"><path d="M14.5 4h-5L7.8 6H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-2.8z"/><circle cx="12" cy="12.5" r="3.3"/></svg>
+      </button>
+      <button id="uploadBtn" class="icon-button" type="button" aria-label="上传照片">
+        <svg viewBox="0 0 24 24"><path d="M12 16V4"/><path d="M7 9l5-5 5 5"/><path d="M5 20h14"/></svg>
+      </button>
+      <button id="switchBtn" class="icon-button" type="button" aria-label="切换镜头" disabled>
+        <svg viewBox="0 0 24 24"><path d="M16 3h5v5"/><path d="M21 3l-7 7"/><path d="M8 21H3v-5"/><path d="M3 21l7-7"/></svg>
+      </button>
+      <button id="downloadBtn" class="icon-button" type="button" aria-label="下载图卡" disabled>
+        <svg viewBox="0 0 24 24"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>
+      </button>
+    </nav>
+  </header>
+
+  <aside id="report" class="report" aria-live="polite">
+    <div class="report-scroll">
+      <div class="report-header">
+        <div class="portrait"><img id="reportPortrait" alt="截取的人像照片" /></div>
+        <div>
+          <p id="reportDate" class="report-kicker">LIVE REPORT</p>
+          <h2 id="reportTitle">专属美学形象鉴定</h2>
+          <p id="reportSubtitle" class="report-subtitle">等待生成中。</p>
+        </div>
+      </div>
+
+      <section class="tryon-stage">
+        <div class="tryon-frame">
+          <img id="tryOnImage" alt="旅行 OOTD 试穿效果图" hidden />
+          <div id="tryOnPlaceholder" class="tryon-placeholder">打响指或点击快门后，会一次生成 3 套旅行试穿效果图。</div>
+          <div id="tryOnBadge" class="tryon-badge">LOOK 0/3</div>
+        </div>
+        <div class="tryon-copy">
+          <h3 id="tryOnTitle">试穿效果图</h3>
+          <p id="tryOnSubtitle">以保留本人五官、脸型、肤色、表情与身材真实度为前提，只更换服装与造型。</p>
+          <div id="tryOnTabs" class="tryon-tabs"></div>
+          <p id="tryOnOutfit" class="tryon-note">生成完成后，打响指可在 3 套试穿图之间切换。</p>
+          <p id="tryOnReason" class="tryon-note">正在等待影像。</p>
+        </div>
+      </section>
+
+      <section class="section">
+        <h3>核心风格定位 <span>STYLE</span></h3>
+        <p id="styleSummary" class="summary"></p>
+        <ul id="styleKeywords" class="chips"></ul>
+      </section>
+
+      <section class="section">
+        <h3>色彩鉴定 <span>COLOR</span></h3>
+        <div class="meta-grid">
+          <div class="meta"><span>肤色冷暖</span><strong id="undertone"></strong></div>
+          <div class="meta"><span>整体明度</span><strong id="brightness"></strong></div>
+        </div>
+        <ul id="bestPalette" class="swatches"></ul>
+        <ul id="colorLists" class="list" style="margin-top: 12px;"></ul>
+      </section>
+
+      <section class="section">
+        <h3>造型补充 <span>DETAIL</span></h3>
+        <p id="faceShapeNote" class="summary"></p>
+        <ul id="hairList" class="list"></ul>
+      </section>
+
+      <section class="section">
+        <h3>旅行穿搭 <span>OOTD</span></h3>
+        <p id="travelOotd" class="summary"></p>
+        <ul id="outfitList" class="list"></ul>
+      </section>
+
+      <section class="section">
+        <p id="message" class="message"></p>
+      </section>
+    </div>
+  </aside>
+
+  <div class="stage-copy">
+    <div id="signal" class="signal">
+      <i class="signal-dot" aria-hidden="true"></i>
+      <span id="statusText">等待摄像头权限</span>
+    </div>
+    <div id="captureCard" class="capture-card">
+      <img id="capturePreview" alt="最近截取照片" />
+      <div>
+        <strong id="captureTitle">已截取头脸照片</strong>
+        <span id="captureMeta">正在整理形象图卡</span>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" role="status"></div>
+  <div id="flash" class="flash"></div>
+  <div id="snapBurst" class="snap-burst" aria-hidden="true"></div>
+  <input id="uploadInput" type="file" accept="image/*" hidden />
+
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4/hands.js" crossorigin="anonymous"></script>
+  <script>
+    const video = document.getElementById('camera');
+    const overlay = document.getElementById('overlay');
+    const ctx = overlay.getContext('2d');
+    const snapBtn = document.getElementById('snapBtn');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const uploadInput = document.getElementById('uploadInput');
+    const switchBtn = document.getElementById('switchBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const signal = document.getElementById('signal');
+    const statusText = document.getElementById('statusText');
+    const toast = document.getElementById('toast');
+    const report = document.getElementById('report');
+    const captureCard = document.getElementById('captureCard');
+    const capturePreview = document.getElementById('capturePreview');
+    const captureMeta = document.getElementById('captureMeta');
+    const reportPortrait = document.getElementById('reportPortrait');
+    const flash = document.getElementById('flash');
+    const snapBurst = document.getElementById('snapBurst');
+    const tryOnImage = document.getElementById('tryOnImage');
+    const tryOnPlaceholder = document.getElementById('tryOnPlaceholder');
+    const tryOnBadge = document.getElementById('tryOnBadge');
+    const tryOnTitle = document.getElementById('tryOnTitle');
+    const tryOnSubtitle = document.getElementById('tryOnSubtitle');
+    const tryOnTabs = document.getElementById('tryOnTabs');
+    const tryOnOutfit = document.getElementById('tryOnOutfit');
+    const tryOnReason = document.getElementById('tryOnReason');
+
+    let stream = null;
+    let faceDetector = null;
+    let hands = null;
+    let facingMode = 'user';
+    let activeFacingMode = 'user';
+    let currentDeviceId = '';
+    let lastFace = null;
+    let lastFaceAt = 0;
+    let loopId = 0;
+    let faceBusy = false;
+    let handBusy = false;
+    let lastFaceSendAt = 0;
+    let lastHandSendAt = 0;
+    let analyzing = false;
+    let latestPortrait = '';
+    let latestReport = null;
+    let tryOnVariants = [];
+    let activeTryOn = 0;
+    let snapPrimed = false;
+    let snapPrimeAt = 0;
+    let lastSnapAt = 0;
+    let lastSnapDistance = 1;
+    let lastPinchClosed = false;
+    let lastMiddleTip = null;
+
+    const colorMap = {
+      '奶油白': '#f6efd9',
+      '燕麦米': '#d8c9ad',
+      '番茄红': '#c64637',
+      '橄榄绿': '#6e7b45',
+      '雾白': '#ebece5',
+      '灰粉': '#c8a8ab',
+      '宝石蓝': '#244f85',
+      '冷松绿': '#47756f',
+      '深灰': '#4b4f52',
+      '丹宁蓝': '#536f91',
+      '黑色': '#111111',
+      '玫瑰': '#c77d86',
+      '可可': '#5d4638'
+    };
+
+    function setStatus(type, text) {
+      signal.className = `signal ${type || ''}`.trim();
+      statusText.textContent = text;
+    }
+
+    function showToast(message) {
+      toast.textContent = message;
+      toast.classList.add('visible');
+      clearTimeout(showToast.timer);
+      showToast.timer = setTimeout(() => toast.classList.remove('visible'), 2600);
+    }
+
+    function playSnapEffect() {
+      flash.classList.remove('pop');
+      snapBurst.classList.remove('pop');
+      void snapBurst.offsetWidth;
+      flash.classList.add('pop');
+      snapBurst.classList.add('pop');
+    }
+
+    async function getVideoDevices() {
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        return devices.filter((device) => device.kind === 'videoinput');
+      } catch (err) {
+        return [];
+      }
+    }
+
+    function deviceMatchesFacing(device, requestedFacing) {
+      const label = (device.label || '').toLowerCase();
+      if (requestedFacing === 'environment') return /back|rear|environment|world|后|背/.test(label);
+      return /front|user|face|facetime|前|正/.test(label);
+    }
+
+    async function buildCameraAttempts(requestedFacing, preferNextDevice) {
+      const size = { width: { ideal: 1280 }, height: { ideal: 960 } };
+      const devices = await getVideoDevices();
+      const attempts = [];
+      const otherDevices = devices.filter((device) => device.deviceId && device.deviceId !== currentDeviceId);
+      const matched = otherDevices.filter((device) => deviceMatchesFacing(device, requestedFacing));
+      const rest = otherDevices.filter((device) => !matched.includes(device));
+      const ordered = preferNextDevice ? [...matched, ...rest] : matched;
+      ordered.forEach((device) => attempts.push({ audio: false, video: { deviceId: { exact: device.deviceId }, ...size } }));
+      attempts.push({ audio: false, video: { facingMode: { ideal: requestedFacing }, ...size } });
+      if (!stream) attempts.push({ audio: false, video: size });
+      return attempts;
+    }
+
+    async function startCamera(requestedFacing = facingMode, options = {}) {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('此浏览器不支持摄像头。请使用 Safari、Chrome 或 Edge 的 localhost/HTTPS 环境。');
+      }
+      setStatus('busy', '正在开启摄像头');
+      const attempts = await buildCameraAttempts(requestedFacing, !!options.preferNextDevice);
+      let nextStream = null;
+      let lastError = null;
+      for (const constraints of attempts) {
+        try {
+          nextStream = await navigator.mediaDevices.getUserMedia(constraints);
+          break;
+        } catch (err) {
+          lastError = err;
+        }
+      }
+      if (!nextStream) throw lastError || new Error('无法开启摄像头。');
+
+      const oldStream = stream;
+      stream = nextStream;
+      video.srcObject = stream;
+      await video.play();
+      if (oldStream) oldStream.getTracks().forEach((track) => track.stop());
+
+      const [track] = stream.getVideoTracks();
+      const settings = track ? track.getSettings() : {};
+      currentDeviceId = settings.deviceId || '';
+      activeFacingMode = settings.facingMode || requestedFacing;
+      facingMode = requestedFacing;
+      video.classList.toggle('mirror', activeFacingMode === 'user');
+      snapBtn.disabled = false;
+      switchBtn.disabled = false;
+      setStatus('ready', '就绪，打响指或点击快门');
+      await setupVision();
+      if (!loopId) loopId = requestAnimationFrame(visionLoop);
+    }
+
+    async function setupVision() {
+      if (hands) return;
+      if ('FaceDetector' in window) {
+        faceDetector = new window.FaceDetector({ fastMode: true, maxDetectedFaces: 1 });
+      }
+      if (!window.Hands) throw new Error('MediaPipe Hands 加载失败，请确认网络可连接。');
+
+      hands = new window.Hands({
+        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4/${file}`
+      });
+      hands.setOptions({
+        maxNumHands: 1,
+        modelComplexity: 1,
+        minDetectionConfidence: 0.36,
+        minTrackingConfidence: 0.32
+      });
+      hands.onResults(onHands);
+    }
+
+    function onHands(results) {
+      const hand = results.multiHandLandmarks && results.multiHandLandmarks[0];
+      const now = performance.now();
+      if (!hand) {
+        if (now - snapPrimeAt > 900) snapPrimed = false;
+        lastSnapDistance = 1;
+        lastMiddleTip = null;
+        lastPinchClosed = false;
+        return;
+      }
+
+      const thumbTip = hand[4];
+      const indexTip = hand[8];
+      const middleTip = hand[12];
+      const wrist = hand[0];
+      const indexBase = hand[5];
+      const middleBase = hand[9];
+      const pinkyBase = hand[17];
+      const palmScale = Math.max(
+        0.035,
+        Math.hypot(wrist.x - middleBase.x, wrist.y - middleBase.y),
+        Math.hypot(indexBase.x - pinkyBase.x, indexBase.y - pinkyBase.y) * 1.15
+      );
+      const middlePinch = Math.hypot(thumbTip.x - middleTip.x, thumbTip.y - middleTip.y) / palmScale;
+      const indexPinch = Math.hypot(thumbTip.x - indexTip.x, thumbTip.y - indexTip.y) / palmScale;
+      const snapDistance = Math.min(middlePinch, indexPinch * 1.12);
+      const openingSpeed = snapDistance - lastSnapDistance;
+      const middleVelocity = lastMiddleTip
+        ? Math.hypot(middleTip.x - lastMiddleTip.x, middleTip.y - lastMiddleTip.y) / palmScale
+        : 0;
+      const wasOpen = lastSnapDistance > 1.04 || !lastPinchClosed;
+      const pinchClosed = snapDistance < 1.16;
+      const pinchOpen = snapDistance > 1.34;
+      const pinchReleased = snapDistance > 1.02;
+      const quickPinch = pinchClosed && wasOpen && !lastPinchClosed;
+      const quickRelease = openingSpeed > 0.055;
+      const fingerFlick = middleVelocity > 0.52;
+
+      if (quickPinch && now - lastSnapAt > 680) {
+        lastSnapAt = now;
+        snapPrimed = true;
+        snapPrimeAt = now;
+      }
+      if (pinchClosed) {
+        snapPrimed = true;
+        snapPrimeAt = now;
+      }
+      if (snapPrimed && now - snapPrimeAt < 1250 && now - lastSnapAt > 680 && (pinchReleased || quickRelease || fingerFlick)) {
+        snapPrimed = false;
+        lastSnapAt = now;
+        handleSnapGesture();
+      }
+      if (now - snapPrimeAt > 1250) snapPrimed = false;
+      if (pinchOpen) lastPinchClosed = false;
+      if (pinchClosed) lastPinchClosed = true;
+      lastSnapDistance = snapDistance;
+      lastMiddleTip = { x: middleTip.x, y: middleTip.y };
+    }
+
+    async function visionLoop(now) {
+      resizeOverlay();
+      drawOverlay();
+      if (video.readyState >= 2 && faceDetector && now - lastFaceSendAt > 360 && !faceBusy) {
+        faceBusy = true;
+        lastFaceSendAt = now;
+        faceDetector.detect(video).then((faces) => {
+          const box = faces && faces[0] && faces[0].boundingBox;
+          if (box && video.videoWidth && video.videoHeight) {
+            lastFace = {
+              normalizedBox: {
+                x: box.x / video.videoWidth,
+                y: box.y / video.videoHeight,
+                w: box.width / video.videoWidth,
+                h: box.height / video.videoHeight
+              }
+            };
+            lastFaceAt = performance.now();
+          }
+        }).catch(() => {}).finally(() => { faceBusy = false; });
+      }
+      if (video.readyState >= 2 && hands && now - lastHandSendAt > 58 && !handBusy && !analyzing) {
+        handBusy = true;
+        lastHandSendAt = now;
+        hands.send({ image: video }).catch(() => {}).finally(() => { handBusy = false; });
+      }
+      loopId = requestAnimationFrame(visionLoop);
+    }
+
+    function resizeOverlay() {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const width = Math.floor(window.innerWidth * dpr);
+      const height = Math.floor(window.innerHeight * dpr);
+      if (overlay.width !== width || overlay.height !== height) {
+        overlay.width = width;
+        overlay.height = height;
+      }
+    }
+
+    function drawOverlay() {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      ctx.clearRect(0, 0, overlay.width, overlay.height);
+      const live = lastFace && performance.now() - lastFaceAt < 900;
+      if (!live) return;
+      const rect = faceBounds(lastFace, overlay.width, overlay.height);
+      ctx.save();
+      ctx.strokeStyle = 'rgba(244, 239, 229, 0.72)';
+      ctx.lineWidth = 1.2 * dpr;
+      ctx.setLineDash([10 * dpr, 10 * dpr]);
+      roundRect(ctx, rect.x, rect.y, rect.w, rect.h, 24 * dpr);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function roundRect(context, x, y, width, height, radius) {
+      const r = Math.min(radius, width / 2, height / 2);
+      context.beginPath();
+      context.moveTo(x + r, y);
+      context.arcTo(x + width, y, x + width, y + height, r);
+      context.arcTo(x + width, y + height, x, y + height, r);
+      context.arcTo(x, y + height, x, y, r);
+      context.arcTo(x, y, x + width, y, r);
+      context.closePath();
+    }
+
+    function faceBounds(landmarks, width, height) {
+      if (landmarks && landmarks.normalizedBox) {
+        const box = landmarks.normalizedBox;
+        const rawX = box.x * width;
+        const rawY = box.y * height;
+        const rawW = box.w * width;
+        const rawH = box.h * height;
+        return {
+          x: Math.max(0, rawX - rawW * 0.2),
+          y: Math.max(0, rawY - rawH * 0.45),
+          w: Math.min(width, rawW * 1.4),
+          h: Math.min(height, rawH * 1.65)
+        };
+      }
+      const xs = landmarks.map((point) => point.x * width);
+      const ys = landmarks.map((point) => point.y * height);
+      const minX = Math.min(...xs);
+      const maxX = Math.max(...xs);
+      const minY = Math.min(...ys);
+      const maxY = Math.max(...ys);
+      const faceW = maxX - minX;
+      const faceH = maxY - minY;
+      return {
+        x: Math.max(0, minX - faceW * 0.22),
+        y: Math.max(0, minY - faceH * 0.34),
+        w: Math.min(width, faceW * 1.44),
+        h: Math.min(height, faceH * 1.38)
+      };
+    }
+
+    function portraitCropRect() {
+      const vw = video.videoWidth || 1280;
+      const vh = video.videoHeight || 960;
+      const live = lastFace && performance.now() - lastFaceAt < 1200;
+      let rect;
+      if (live) {
+        const bounds = faceBounds(lastFace, vw, vh);
+        rect = {
+          x: bounds.x - bounds.w * 0.42,
+          y: bounds.y - bounds.h * 0.12,
+          w: bounds.w * 1.84,
+          h: bounds.h * 2.35
+        };
+      } else {
+        const sideW = vw * 0.78;
+        rect = { x: (vw - sideW) / 2, y: vh * 0.04, w: sideW, h: vh * 0.92 };
+      }
+      const targetRatio = 4 / 5;
+      const currentRatio = rect.w / rect.h;
+      if (currentRatio > targetRatio) {
+        const nextH = rect.w / targetRatio;
+        rect.y -= (nextH - rect.h) / 2;
+        rect.h = nextH;
+      } else {
+        const nextW = rect.h * targetRatio;
+        rect.x -= (nextW - rect.w) / 2;
+        rect.w = nextW;
+      }
+      rect.x = Math.max(0, Math.min(vw - rect.w, rect.x));
+      rect.y = Math.max(0, Math.min(vh - rect.h, rect.y));
+      rect.w = Math.min(vw, rect.w);
+      rect.h = Math.min(vh, rect.h);
+      return rect;
+    }
+
+    function capturePortrait() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 960;
+      canvas.height = 1200;
+      const target = canvas.getContext('2d');
+      const rect = portraitCropRect();
+      target.drawImage(video, rect.x, rect.y, rect.w, rect.h, 0, 0, canvas.width, canvas.height);
+      return canvas;
+    }
+
+    function estimateFaceShape() {
+      if (!lastFace) return { id: 'uncertain', label: '自然轮廓' };
+      if (lastFace.normalizedBox) {
+        const ratio = lastFace.normalizedBox.w / Math.max(0.01, lastFace.normalizedBox.h);
+        if (ratio > 0.86) return { id: 'round', label: '圆润短脸' };
+        if (ratio < 0.66) return { id: 'oblong', label: '偏长轮廓' };
+        return { id: 'oval', label: '鹅蛋型轮廓' };
+      }
+      const xs = lastFace.map((point) => point.x);
+      const ys = lastFace.map((point) => point.y);
+      const width = Math.max(...xs) - Math.min(...xs);
+      const height = Math.max(...ys) - Math.min(...ys);
+      const ratio = width / Math.max(0.01, height);
+      if (ratio > 0.78) return { id: 'round', label: '圆润短脸' };
+      if (ratio < 0.61) return { id: 'oblong', label: '偏长轮廓' };
+      const jawLeft = lastFace[172] || lastFace[234];
+      const jawRight = lastFace[397] || lastFace[454];
+      const cheekLeft = lastFace[234];
+      const cheekRight = lastFace[454];
+      if (jawLeft && jawRight && cheekLeft && cheekRight) {
+        const jawW = Math.abs(jawRight.x - jawLeft.x);
+        const cheekW = Math.abs(cheekRight.x - cheekLeft.x);
+        if (jawW / Math.max(0.01, cheekW) > 0.82) return { id: 'square', label: '利落方圆脸' };
+      }
+      return { id: 'oval', label: '鹅蛋型轮廓' };
+    }
+
+    function faceShapeFromCanvas(canvas) {
+      const ratio = canvas.width / Math.max(1, canvas.height);
+      if (ratio > 0.86) return { id: 'round', label: '偏宽取景' };
+      if (ratio < 0.66) return { id: 'oblong', label: '偏长取景' };
+      return { id: 'uncertain', label: '自然轮廓' };
+    }
+
+    function estimateSkin(canvas) {
+      const sample = document.createElement('canvas');
+      sample.width = 80;
+      sample.height = 80;
+      const sampleCtx = sample.getContext('2d');
+      sampleCtx.drawImage(canvas, canvas.width * 0.35, canvas.height * 0.34, canvas.width * 0.3, canvas.height * 0.24, 0, 0, 80, 80);
+      const data = sampleCtx.getImageData(0, 0, 80, 80).data;
+      let r = 0, g = 0, b = 0, count = 0;
+      for (let i = 0; i < data.length; i += 16) {
+        const rr = data[i];
+        const gg = data[i + 1];
+        const bb = data[i + 2];
+        const max = Math.max(rr, gg, bb);
+        const min = Math.min(rr, gg, bb);
+        if (max < 34 || max - min < 6) continue;
+        r += rr;
+        g += gg;
+        b += bb;
+        count += 1;
+      }
+      if (!count) return { undertone: 'uncertain', lightness: 0.56, rgb: [0, 0, 0] };
+      r /= count;
+      g /= count;
+      b /= count;
+      const lightness = (Math.max(r, g, b) + Math.min(r, g, b)) / 510;
+      const delta = r - b;
+      const undertone = delta > 15 ? 'warm' : delta > 6 ? 'neutral-warm' : delta < -2 ? 'cool' : 'neutral-cool';
+      return { undertone, lightness: Number(lightness.toFixed(2)), rgb: [Math.round(r), Math.round(g), Math.round(b)] };
+    }
+
+    function buildMetrics(canvas, options = {}) {
+      return {
+        capturedAt: new Date().toISOString(),
+        inputSource: options.source || 'camera',
+        faceShape: options.faceShape || estimateFaceShape(),
+        skin: estimateSkin(canvas),
+        camera: {
+          facingMode: activeFacingMode,
+          hasLiveFaceTracking: !!(lastFace && performance.now() - lastFaceAt < 1200)
+        }
+      };
+    }
+
+    function handleSnapGesture() {
+      if (analyzing) return;
+      if (tryOnVariants.length) {
+        playSnapEffect();
+        cycleTryOn();
+        return;
+      }
+      playSnapEffect();
+      captureAndAnalyze('snap');
+    }
+
+    async function captureAndAnalyze(source) {
+      if (analyzing || video.readyState < 2) return;
+      const canvas = capturePortrait();
+      const imageDataUrl = canvas.toDataURL('image/jpeg', 0.92);
+      const metrics = buildMetrics(canvas, { source: 'camera' });
+      await generateFromPortrait(imageDataUrl, metrics, source);
+    }
+
+    async function generateFromPortrait(imageDataUrl, metrics, source = 'upload') {
+      if (analyzing) return;
+      analyzing = true;
+      tryOnVariants = [];
+      activeTryOn = 0;
+      document.body.classList.remove('tryon-ready');
+      if (source !== 'snap') playSnapEffect();
+      setStatus('busy', source === 'snap' ? '已检测打响指，正在生成 3 套试穿图' : '正在生成 3 套试穿图');
+      snapBtn.disabled = true;
+      uploadBtn.disabled = true;
+      downloadBtn.disabled = true;
+      try {
+        latestPortrait = imageDataUrl;
+        capturePreview.src = latestPortrait;
+        reportPortrait.src = latestPortrait;
+        captureCard.classList.add('visible');
+        captureMeta.textContent = source === 'upload' ? '已读取上传照片，正在生成试穿图' : '正在生成 3 套旅行试穿图';
+        report.classList.add('visible');
+        renderLoading();
+
+        const response = await fetch('/api/aesthetic-card', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image: latestPortrait, metrics })
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+        latestReport = data;
+        renderReport(data);
+        captureMeta.textContent = '形象方案完成，正在生图';
+        setStatus('busy', '方案完成，Gemini 正在生成试穿图');
+
+        const tryOnResponse = await fetch('/api/aesthetic-tryon', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: latestPortrait, looks: data.tryOnLooks || [], genderPresentation: data.genderPresentation, limit: 3 })
+        });
+        const tryOnData = await tryOnResponse.json().catch(() => ({}));
+        if (!tryOnResponse.ok) throw new Error(tryOnData.error || `HTTP ${tryOnResponse.status}`);
+        tryOnVariants = (tryOnData.variants || []).slice(0, 3);
+        activeTryOn = 0;
+        renderTryOns();
+        const successCount = tryOnVariants.filter((item) => item.image).length;
+        captureMeta.textContent = successCount ? `已完成 ${successCount}/3 套试穿图` : '试穿图生成失败';
+        downloadBtn.disabled = false;
+        if (successCount) {
+          document.body.classList.add('tryon-ready');
+          playSnapEffect();
+        }
+        if (data.warning) showToast(`AI 服务暂不可用，已先生成本地版：${data.warning}`);
+        setStatus('ready', successCount ? '试穿图完成，打响指切换 Look' : '方案完成，但试穿图生成失败');
+      } catch (err) {
+        setStatus('error', '生成失败，请重新截取');
+        showToast(err.message || String(err));
+      } finally {
+        analyzing = false;
+        snapBtn.disabled = false;
+        uploadBtn.disabled = false;
+      }
+    }
+
+    function loadImage(src) {
+      return new Promise((resolve, reject) => {
+        const image = new Image();
+        image.onload = () => resolve(image);
+        image.onerror = reject;
+        image.src = src;
+      });
+    }
+
+    async function fileToPortrait(file) {
+      const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      const image = await loadImage(dataUrl);
+      const maxSide = 1600;
+      const scale = Math.min(1, maxSide / Math.max(image.naturalWidth, image.naturalHeight));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+      canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+      canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
+      return {
+        image: canvas.toDataURL('image/jpeg', 0.94),
+        metrics: {
+          ...buildMetrics(canvas, { source: 'upload', faceShape: faceShapeFromCanvas(canvas) }),
+          upload: {
+            originalWidth: image.naturalWidth,
+            originalHeight: image.naturalHeight,
+            compressedWidth: canvas.width,
+            compressedHeight: canvas.height
+          }
+        }
+      };
+    }
+
+    function renderTryOnLoading(looks = []) {
+      tryOnImage.hidden = true;
+      tryOnImage.removeAttribute('src');
+      tryOnPlaceholder.hidden = false;
+      tryOnPlaceholder.textContent = 'Gemini 正在生成 3 套试穿效果图，请稍候。';
+      tryOnBadge.textContent = 'LOOK 0/3';
+      tryOnTitle.textContent = '试穿效果图';
+      tryOnSubtitle.textContent = '保持本人原本五官、脸型、肤色、表情与身材真实度，只改变服装与造型。';
+      tryOnOutfit.textContent = looks[0]?.outfit || '正在整理旅行 OOTD。';
+      tryOnReason.textContent = looks[0]?.reason || '生成后可打响指切换三套效果图。';
+      renderTryOnTabs(looks, -1);
+    }
+
+    function renderTryOns() {
+      const looks = tryOnVariants.length ? tryOnVariants : (latestReport?.tryOnLooks || []);
+      renderTryOnTabs(looks, activeTryOn);
+      const current = looks[activeTryOn] || looks[0];
+      if (!current) {
+        renderTryOnLoading([]);
+        return;
+      }
+      tryOnBadge.textContent = `LOOK ${activeTryOn + 1}/${Math.max(3, looks.length)}`;
+      tryOnTitle.textContent = current.label || `Look ${activeTryOn + 1}`;
+      tryOnSubtitle.textContent = current.subtitle || '旅行 OOTD';
+      tryOnOutfit.textContent = current.outfit || '';
+      tryOnReason.textContent = current.error ? `生成失败：${current.error}` : (current.reason || '');
+      if (current.image) {
+        tryOnImage.hidden = false;
+        tryOnImage.src = current.image;
+        tryOnPlaceholder.hidden = true;
+      } else {
+        tryOnImage.hidden = true;
+        tryOnImage.removeAttribute('src');
+        tryOnPlaceholder.hidden = false;
+        tryOnPlaceholder.textContent = current.error ? '这套试穿图生成失败，可切换其他 Look。' : '试穿图生成中。';
+      }
+    }
+
+    function renderTryOnTabs(looks = [], selected = activeTryOn) {
+      tryOnTabs.innerHTML = '';
+      const padded = looks.length ? looks : [{ label: 'Look 1' }, { label: 'Look 2' }, { label: 'Look 3' }];
+      padded.slice(0, 3).forEach((look, index) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = `tryon-tab ${index === selected ? 'active' : ''}`.trim();
+        button.textContent = look.label || `Look ${index + 1}`;
+        button.addEventListener('click', () => {
+          if (analyzing) return;
+          activeTryOn = index;
+          renderTryOns();
+        });
+        tryOnTabs.appendChild(button);
+      });
+    }
+
+    function cycleTryOn() {
+      if (!tryOnVariants.length) return;
+      activeTryOn = (activeTryOn + 1) % tryOnVariants.length;
+      renderTryOns();
+      setStatus('ready', `已切换到 Look ${activeTryOn + 1}/3`);
+    }
+
+    function escapeHtml(value) {
+      return String(value || '').replace(/[&<>"']/g, (char) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      }[char]));
+    }
+
+    function emphasize(text, bold = []) {
+      let output = escapeHtml(text);
+      for (const phrase of bold || []) {
+        const safe = escapeHtml(phrase);
+        if (!safe) continue;
+        output = output.replaceAll(safe, `<strong>${safe}</strong>`);
+      }
+      return output;
+    }
+
+    function setList(id, items, bold = []) {
+      const node = document.getElementById(id);
+      node.innerHTML = '';
+      for (const item of items || []) {
+        const li = document.createElement('li');
+        li.innerHTML = emphasize(item, bold);
+        node.appendChild(li);
+      }
+    }
+
+    function setChips(id, items) {
+      const node = document.getElementById(id);
+      node.innerHTML = '';
+      for (const item of items || []) {
+        const li = document.createElement('li');
+        li.className = 'chip';
+        li.textContent = item;
+        node.appendChild(li);
+      }
+    }
+
+    function setSwatches(id, items) {
+      const node = document.getElementById(id);
+      node.innerHTML = '';
+      for (const item of items || []) {
+        const li = document.createElement('li');
+        li.className = 'swatch';
+        const dot = document.createElement('i');
+        dot.style.setProperty('--swatch', colorMap[item] || colorMap[Object.keys(colorMap).find((key) => item.includes(key))] || '#cdbf9f');
+        const label = document.createElement('span');
+        label.textContent = item;
+        li.append(dot, label);
+        node.appendChild(li);
+      }
+    }
+
+    function renderLoading() {
+      document.getElementById('reportDate').textContent = 'GENERATING';
+      document.getElementById('reportTitle').textContent = '专属美学形象鉴定';
+      document.getElementById('reportSubtitle').textContent = '正在生成简体中文时尚杂志风试穿方案。';
+      renderTryOnLoading([]);
+      document.getElementById('styleSummary').textContent = '分析中。';
+      setChips('styleKeywords', ['色彩', '轮廓', '比例']);
+      document.getElementById('undertone').textContent = '分析中';
+      document.getElementById('brightness').textContent = '分析中';
+      setSwatches('bestPalette', ['雾白', '灰粉', '宝石蓝', '冷松绿']);
+      setList('colorLists', ['最佳色盘、避开色系与妆容色彩整理中。']);
+      document.getElementById('faceShapeNote').textContent = '脸型与五官比例整理中。';
+      setList('hairList', ['发型与发色建议整理中。']);
+      document.getElementById('travelOotd').textContent = '旅行 OOTD 整理中。';
+      setList('outfitList', ['配色与配饰材质整理中。']);
+      document.getElementById('message').textContent = '形象寄语生成中。';
+    }
+
+    function renderReport(data) {
+      const style = data.stylePositioning || {};
+      const color = data.colorDiagnosis || {};
+      const hair = data.hairAdvice || {};
+      const outfit = data.outfitAdvice || {};
+      document.getElementById('reportDate').textContent = data.date || 'LIVE REPORT';
+      document.getElementById('reportTitle').textContent = data.title || '专属美学形象鉴定';
+      document.getElementById('reportSubtitle').textContent = data.subtitle || '';
+      renderTryOnLoading(data.tryOnLooks || []);
+      document.getElementById('styleSummary').innerHTML = emphasize(style.summary, style.bold);
+      setChips('styleKeywords', style.keywords || []);
+      document.getElementById('undertone').textContent = color.undertone || '不确定';
+      document.getElementById('brightness').textContent = color.brightness || '不确定';
+      setSwatches('bestPalette', color.bestPalette || []);
+      setList('colorLists', [
+        `应避开：${(color.avoidPalette || []).join('、')}`,
+        `妆容色彩：${(color.makeupColors || []).join('、')}`
+      ], color.bold);
+      document.getElementById('faceShapeNote').innerHTML = emphasize(hair.faceShapeNote, hair.bold);
+      setList('hairList', [
+        `推荐发型：${(hair.styles || []).join('、')}`,
+        `推荐发色：${(hair.colors || []).join('、')}`
+      ], hair.bold);
+      document.getElementById('travelOotd').innerHTML = emphasize(outfit.travelOotd, outfit.bold);
+      setList('outfitList', [
+        `穿搭配色：${(outfit.colorCombos || []).join('、')}`,
+        `配饰材质：${(outfit.materials || []).join('、')}`
+      ], outfit.bold);
+      document.getElementById('message').textContent = data.message || '';
+    }
+
+    function drawWrappedText(canvasCtx, text, x, y, maxWidth, lineHeight, maxLines = 4) {
+      const chars = String(text || '').split('');
+      let line = '';
+      let lines = 0;
+      for (const char of chars) {
+        const test = line + char;
+        if (canvasCtx.measureText(test).width > maxWidth && line) {
+          canvasCtx.fillText(line, x, y);
+          y += lineHeight;
+          lines += 1;
+          line = char;
+          if (lines >= maxLines - 1) break;
+        } else {
+          line = test;
+        }
+      }
+      if (line && lines < maxLines) canvasCtx.fillText(line, x, y);
+      return y + lineHeight;
+    }
+
+    async function downloadCard() {
+      if (!latestReport || !latestPortrait) return;
+      const card = document.createElement('canvas');
+      card.width = 1080;
+      card.height = 1600;
+      const c = card.getContext('2d');
+      c.fillStyle = '#f4efe5';
+      c.fillRect(0, 0, card.width, card.height);
+      c.fillStyle = '#111514';
+      c.fillRect(0, 0, card.width, 250);
+      c.fillStyle = '#d7b56d';
+      c.fillRect(0, 247, card.width, 3);
+
+      const img = new Image();
+      img.src = latestPortrait;
+      await img.decode();
+      c.save();
+      roundRect(c, 60, 70, 190, 238, 28);
+      c.clip();
+      c.drawImage(img, 0, 0, img.width, img.height, 60, 70, 190, 238);
+      c.restore();
+
+      c.fillStyle = '#f4efe5';
+      c.font = '700 54px "Songti TC", serif';
+      c.fillText(latestReport.title || '专属美学形象鉴定', 290, 116);
+      c.font = '400 25px system-ui, sans-serif';
+      drawWrappedText(c, latestReport.subtitle || '', 292, 164, 690, 36, 2);
+      c.fillStyle = 'rgba(244,239,229,0.62)';
+      c.font = '700 22px system-ui, sans-serif';
+      c.fillText(latestReport.date || '', 292, 230);
+
+      let y = 360;
+      const activeVariant = tryOnVariants[activeTryOn] || tryOnVariants.find((item) => item.image);
+      if (activeVariant?.image) {
+        const tryOn = new Image();
+        tryOn.src = activeVariant.image;
+        await tryOn.decode();
+        c.save();
+        roundRect(c, 60, 330, 420, 560, 34);
+        c.clip();
+        c.drawImage(tryOn, 0, 0, tryOn.width, tryOn.height, 60, 330, 420, 560);
+        c.restore();
+        c.fillStyle = '#111514';
+        c.font = '800 34px system-ui, sans-serif';
+        c.fillText(activeVariant.label || '试穿 Look', 520, 380);
+        c.fillStyle = 'rgba(17,21,20,0.76)';
+        c.font = '400 25px system-ui, sans-serif';
+        drawWrappedText(c, activeVariant.outfit || '', 520, 425, 480, 38, 5);
+        y = 950;
+      }
+      const block = (title, body, items = []) => {
+        c.fillStyle = '#111514';
+        c.font = '800 31px system-ui, sans-serif';
+        c.fillText(title, 70, y);
+        y += 48;
+        c.fillStyle = 'rgba(17,21,20,0.76)';
+        c.font = '400 25px system-ui, sans-serif';
+        y = drawWrappedText(c, body, 70, y, 940, 38, 3) + 18;
+        c.font = '700 24px system-ui, sans-serif';
+        for (const item of items.slice(0, 4)) {
+          c.fillStyle = '#111514';
+          c.fillText(`• ${item}`, 86, y);
+          y += 36;
+        }
+        y += 28;
+      };
+
+      const style = latestReport.stylePositioning || {};
+      const color = latestReport.colorDiagnosis || {};
+      const outfit = latestReport.outfitAdvice || {};
+      block('核心风格定位', style.summary || '', style.keywords || []);
+      block('色彩鉴定', `${color.undertone || ''}｜${color.brightness || ''}`, [
+        `最佳色盘：${(color.bestPalette || []).join('、')}`,
+        `妆容色彩：${(color.makeupColors || []).join('、')}`
+      ]);
+      block('旅行穿搭', outfit.travelOotd || '', [
+        `配色：${(outfit.colorCombos || []).join('、')}`,
+        `材质：${(outfit.materials || []).join('、')}`
+      ]);
+
+      c.fillStyle = '#111514';
+      roundRect(c, 60, 1380, 960, 140, 28);
+      c.fill();
+      c.fillStyle = '#f4efe5';
+      c.font = '400 31px "Songti TC", serif';
+      drawWrappedText(c, latestReport.message || '', 95, 1440, 890, 44, 2);
+
+      const link = document.createElement('a');
+      link.download = `aesthetic-card-${Date.now()}.png`;
+      link.href = card.toDataURL('image/png');
+      link.click();
+    }
+
+    snapBtn.addEventListener('click', () => captureAndAnalyze('button'));
+
+    uploadBtn.addEventListener('click', () => {
+      if (analyzing) return;
+      uploadInput.click();
+    });
+
+    uploadInput.addEventListener('change', async () => {
+      const file = uploadInput.files && uploadInput.files[0];
+      uploadInput.value = '';
+      if (!file) return;
+      if (!file.type.startsWith('image/')) {
+        showToast('请上传 JPG、PNG 或 WebP 图片。');
+        return;
+      }
+      try {
+        setStatus('busy', '正在读取上传照片');
+        const portrait = await fileToPortrait(file);
+        await generateFromPortrait(portrait.image, portrait.metrics, 'upload');
+      } catch (err) {
+        setStatus('error', '上传照片读取失败');
+        showToast(err.message || String(err));
+      }
+    });
+
+    switchBtn.addEventListener('click', () => {
+      facingMode = activeFacingMode === 'user' ? 'environment' : 'user';
+      startCamera(facingMode, { preferNextDevice: true }).catch((err) => {
+        setStatus('error', '切换镜头失败');
+        showToast(err.message || String(err));
+      });
+    });
+
+    downloadBtn.addEventListener('click', () => {
+      downloadCard().catch((err) => showToast(err.message || String(err)));
+    });
+
+    window.addEventListener('resize', resizeOverlay);
+    setStatus('busy', '正在开启摄像头');
+    startCamera().catch((err) => {
+      setStatus('error', '摄像头无法开启');
+      showToast(err.message || String(err));
+    });
+  </script>
+</body>
+</html>
