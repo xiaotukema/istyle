@@ -9,7 +9,7 @@ App({
 
   globalData: {
     useCloudContainer: true,
-    cloudEnv: '',
+    cloudEnv: 'cloudbase-d3gvks8mve656203b',
     cloudService: 'istyle',
     apiBase: 'http://127.0.0.1:8000',
     token: '',
