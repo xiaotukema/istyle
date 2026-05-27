@@ -49,9 +49,9 @@ const imageProvider = (process.env.IMAGE_PROVIDER || (process.env.GEMINI_API_KEY
 const model = process.env.OPENAI_IMAGE_MODEL || 'gpt-image-1.5';
 const geminiModel = process.env.GEMINI_IMAGE_MODEL || 'gemini-3-pro-image-preview';
 const analysisProvider = (process.env.ANALYSIS_PROVIDER || (process.env.GEMINI_API_KEY ? 'gemini' : process.env.OPENAI_API_KEY ? 'openai' : 'local')).toLowerCase();
-const analysisModel = process.env.ANALYSIS_MODEL || (analysisProvider === 'gemini' ? 'gemini-2.5-flash' : 'gpt-4.1-mini');
+const analysisModel = process.env.ANALYSIS_MODEL || (analysisProvider === 'gemini' ? 'gemini-2.5-pro' : 'gpt-4.1-mini');
 const aestheticAnalysisProvider = (process.env.AESTHETIC_ANALYSIS_PROVIDER || aestheticConfig.analysisProvider || analysisProvider).toLowerCase();
-const aestheticAnalysisModel = process.env.AESTHETIC_ANALYSIS_MODEL || aestheticConfig.analysisModel || (aestheticAnalysisProvider === 'gemini' ? 'gemini-2.5-flash' : analysisModel);
+const aestheticAnalysisModel = process.env.AESTHETIC_ANALYSIS_MODEL || aestheticConfig.analysisModel || (aestheticAnalysisProvider === 'gemini' ? 'gemini-2.5-pro' : analysisModel);
 const aestheticImageProvider = (process.env.AESTHETIC_IMAGE_PROVIDER || aestheticConfig.imageProvider || 'gemini').toLowerCase();
 const aestheticGeminiModel = process.env.AESTHETIC_GEMINI_IMAGE_MODEL || aestheticConfig.geminiImageModel || geminiModel;
 const aestheticTryOnLimit = Number(process.env.AESTHETIC_TRYON_LIMIT || aestheticConfig.tryOnLimit || 3);

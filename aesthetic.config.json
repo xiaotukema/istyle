@@ -1,7 +1,7 @@
 {
   "page": "aesthetic-snap",
   "analysisProvider": "gemini",
-  "analysisModel": "gemini-2.5-flash",
+  "analysisModel": "gemini-2.5-pro",
   "imageProvider": "gemini",
   "geminiImageModel": "gemini-3-pro-image-preview",
   "tryOnLimit": 3,
