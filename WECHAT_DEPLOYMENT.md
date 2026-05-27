@@ -1,8 +1,11 @@
 # WeChat Mini Program Deployment Plan
 
-## 1. Backend
+## 1. Recommended Backend: WeChat CloudBase Run
 
-Deploy the Node backend to an HTTPS domain.
+Use WeChat CloudBase Run / 微信云托管 for the Node backend. This keeps the
+current `server.js` shape, lets the mini program call the backend through
+`wx.cloud.callContainer`, and avoids configuring a separate request legal domain
+in the mini program console.
 
 Required environment variables:
 
@@ -12,18 +15,21 @@ IMAGE_PROVIDER=gemini
 ANALYSIS_PROVIDER=gemini
 GEMINI_IMAGE_MODEL=gemini-3-pro-image-preview
 ANALYSIS_MODEL=gemini-2.5-flash
-WX_APPID=...
-WX_APP_SECRET=...
 DAILY_HAIR_LIMIT=11
 HAIR_VARIANT_CONCURRENCY=1
 ```
 
-Before real launch, replace the current in-memory auth/quota storage with persistent storage.
+When running through CloudBase Run, the backend reads the WeChat openid from
+the cloud container request header. `WX_APPID` and `WX_APP_SECRET` are only
+needed for the local HTTPS backend fallback that uses `wx.login` and
+`/api/auth/wechat-login`.
+
+Before real launch, replace the current in-memory quota storage with persistent
+storage.
 
 Recommended tables/keys:
 
 - `users`: `openid`, `created_at`
-- `sessions`: `token`, `openid`, `expires_at`
 - `daily_generation_usage`: `openid`, `date`, `used_count`
 
 ## 2. Mini Program
@@ -32,14 +38,19 @@ Open `miniprogram/` in WeChat DevTools.
 
 Update:
 
-- `miniprogram/project.config.json`: replace `touristappid` with the real AppID.
-- `miniprogram/app.js`: set `apiBase` to the deployed HTTPS backend.
+- `miniprogram/project.config.json`: AppID is set to the real mini program AppID.
+- `miniprogram/app.js`: set `cloudEnv` to the CloudBase environment ID.
+- `miniprogram/app.js`: set `cloudService` to the CloudBase Run service name.
+- Keep `useCloudContainer: true` for production.
 
-## 3. WeChat Console
+For local backend debugging, set `useCloudContainer: false` and keep `apiBase`
+pointing at `http://127.0.0.1:8000`.
 
-In the WeChat Mini Program admin console:
+## 3. WeChat Console / CloudBase
 
-- Add the backend HTTPS domain to request legal domains.
+- Enable CloudBase / 云开发 for the mini program.
+- Create a CloudBase Run service for this Node project.
+- Configure the environment variables listed above.
 - Enable camera permission description.
 - Upload code through WeChat DevTools.
 - Submit for review.

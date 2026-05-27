@@ -330,7 +330,15 @@ function bearerToken(req) {
   return match ? match[1] : '';
 }
 
+function cloudOpenid(req) {
+  return req.headers['x-wx-openid'] || req.headers['x-wx-from-openid'] || '';
+}
+
 function sessionUser(req) {
+  const openid = cloudOpenid(req);
+  if (openid) {
+    return { openid, source: 'wechat-cloud' };
+  }
   const token = bearerToken(req);
   return token ? authSessions.get(token) : null;
 }
