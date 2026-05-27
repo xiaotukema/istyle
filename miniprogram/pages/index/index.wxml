@@ -14,6 +14,10 @@
     <view class="caption">{{currentStyle.rank}}. {{currentStyle.label}}</view>
     <view class="reason">{{currentStyle.reason}}</view>
   </view>
+  <view class="tryon-error" wx:elif="{{tryonError}}">
+    <view class="caption">高清试戴图生成失败</view>
+    <view class="reason">{{tryonError}}</view>
+  </view>
 
   <view class="loading" wx:if="{{loading}}">
     <view class="spinner"></view>

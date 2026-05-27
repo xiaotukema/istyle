@@ -34,7 +34,8 @@
   font-size: 24rpx;
 }
 
-.tryon {
+.tryon,
+.tryon-error {
   position: fixed;
   left: 32rpx;
   right: 32rpx;
@@ -48,6 +49,11 @@
 .tryon image {
   width: 100%;
   height: calc(100% - 112rpx);
+}
+
+.tryon-error {
+  bottom: auto;
+  padding: 24rpx;
 }
 
 .caption {

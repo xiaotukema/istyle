@@ -1115,6 +1115,7 @@ async function createRecommendedTryOns(imageDataUrl, recommendations = [], optio
         provider: imageProvider
       };
     } catch (err) {
+      console.error(`[hair-tryon] ${style.label} failed: ${err.stack || err.message || String(err)}`);
       return {
         id: style.id,
         label: style.label,
@@ -1357,7 +1358,7 @@ async function createSeedreamStyleVariant(imageDataUrl, style) {
   }
   return {
     ...style,
-    image: await dataUrlFromRemoteImage(url)
+    image: url
   };
 }
 

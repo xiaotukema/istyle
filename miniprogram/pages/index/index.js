@@ -14,6 +14,7 @@ Page({
     currentStyle: {},
     currentImage: '',
     analysis: {},
+    tryonError: '',
     loading: false,
     loadingText: '',
     remainingCount: TOTAL_COUNT
@@ -80,19 +81,30 @@ Page({
       }
     });
     const byId = new Map((payload.variants || []).map((item) => [item.id, item]));
+    const errors = [];
     const nextStyles = this.data.styles.map((style) => {
       const generated = byId.get(style.id);
-      return generated && generated.image ? { ...style, tryonImage: generated.image } : style;
+      if (generated && generated.image) return { ...style, tryonImage: generated.image, tryonError: '' };
+      if (generated && generated.error) {
+        errors.push(generated.error);
+        return { ...style, tryonError: generated.error };
+      }
+      return style;
     });
     const firstIndex = nextStyles.findIndex((style) => style.tryonImage);
+    const activeIndex = firstIndex >= 0 ? firstIndex : this.data.currentIndex;
     this.setData({
       styles: nextStyles,
-      currentIndex: firstIndex >= 0 ? firstIndex : this.data.currentIndex,
-      currentStyle: nextStyles[firstIndex >= 0 ? firstIndex : this.data.currentIndex] || {},
-      currentImage: nextStyles[firstIndex >= 0 ? firstIndex : this.data.currentIndex]?.tryonImage || '',
+      currentIndex: activeIndex,
+      currentStyle: nextStyles[activeIndex] || {},
+      currentImage: nextStyles[activeIndex]?.tryonImage || '',
+      tryonError: firstIndex >= 0 ? '' : (errors[0] || '试戴图生成失败，请查看云托管运行日志。'),
       quota: payload.quota || this.data.quota,
       remainingCount: Math.max(0, TOTAL_COUNT - nextStyles.length)
     });
+    if (errors.length && firstIndex < 0) {
+      wx.showToast({ title: errors[0].slice(0, 30), icon: 'none' });
+    }
   },
 
   async recommendMore() {
@@ -138,12 +150,27 @@ Page({
     this.setData({
       currentIndex: index,
       currentStyle: style,
-      currentImage: style.tryonImage || ''
+      currentImage: style.tryonImage || '',
+      tryonError: style.tryonError || ''
     });
   },
 
   saveImage() {
     if (!this.data.currentImage) return;
+    if (/^https?:\/\//i.test(this.data.currentImage)) {
+      wx.downloadFile({
+        url: this.data.currentImage,
+        success: (res) => {
+          wx.saveImageToPhotosAlbum({
+            filePath: res.tempFilePath,
+            success: () => wx.showToast({ title: '已保存' }),
+            fail: () => wx.showToast({ title: '保存失败', icon: 'none' })
+          });
+        },
+        fail: () => wx.showToast({ title: '下载图片失败', icon: 'none' })
+      });
+      return;
+    }
     wx.getFileSystemManager().writeFile({
       filePath: `${wx.env.USER_DATA_PATH}/istyle-${Date.now()}.png`,
       data: this.data.currentImage.replace(/^data:image\/\w+;base64,/, ''),
