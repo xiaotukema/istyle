@@ -55,6 +55,23 @@ pointing at `http://127.0.0.1:8000`.
 - Upload code through WeChat DevTools.
 - Submit for review.
 
+Suggested CloudBase Run settings:
+
+- Public access: on during debugging, can be turned off after mini program
+  `callContainer` is verified.
+- Internal access: off for now.
+- CPU / memory: 1 core / 2 GB.
+- Instances: min 0, max 5.
+- Scaling: CPU >= 80%, memory >= 80%.
+- Log path: stdout.
+- Pipeline code source: GitHub.
+- Repository: `xiaotukema/istyle`.
+- Branch: `main`.
+- Target directory: empty or `/`.
+- Port: `80`.
+- Dockerfile: enabled.
+- Dockerfile name: `Dockerfile`.
+
 ## 4. Product Quota Rule
 
 Per user per day:
