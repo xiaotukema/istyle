@@ -3,6 +3,12 @@ const { request, uploadCapture } = require('../../utils/api');
 const INITIAL_COUNT = 5;
 const MORE_COUNT = 3;
 const TOTAL_COUNT = 11;
+const TRYON_POLL_INTERVAL = 2000;
+const TRYON_POLL_LIMIT = 120;
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 Page({
   data: {
@@ -82,7 +88,7 @@ Page({
       });
 
       try {
-        const payload = await request('/api/hair-tryon', {
+        const job = await request('/api/hair-tryon-job', {
           method: 'POST',
           data: {
             image: this.data.image,
@@ -90,6 +96,8 @@ Page({
             limit: 1
           }
         });
+        if (job.quota) this.setData({ quota: job.quota });
+        const payload = await this.waitForTryOnJob(job.jobId, style.label, index + 1, pendingStyles.length);
         const generated = (payload.variants || [])[0] || {};
         if (generated.error) errors.push(generated.error);
 
@@ -137,6 +145,21 @@ Page({
     if (!hasImage && errors.length) {
       this.setData({ tryonError: errors[0] });
     }
+  },
+
+  async waitForTryOnJob(jobId, label, index, total) {
+    if (!jobId) throw new Error('生成任务创建失败');
+    for (let attempt = 0; attempt < TRYON_POLL_LIMIT; attempt += 1) {
+      await delay(TRYON_POLL_INTERVAL);
+      this.setData({
+        loadingText: `正在生成第 ${index}/${total} 款试戴图：${label}（约 ${Math.max(2, (attempt + 1) * 2)} 秒）`
+      });
+      const job = await request(`/api/hair-tryon-job?id=${encodeURIComponent(jobId)}`);
+      if (job.quota) this.setData({ quota: job.quota });
+      if (job.status === 'done') return job.result || {};
+      if (job.status === 'failed') throw new Error(job.error || '试戴图生成失败');
+    }
+    throw new Error('试戴图生成超时，请稍后重试');
   },
 
   async recommendMore() {

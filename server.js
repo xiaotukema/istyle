@@ -71,6 +71,8 @@ const dailyHairLimit = Number(process.env.DAILY_HAIR_LIMIT || 11);
 const enableDevQuotaReset = process.env.ENABLE_DEV_QUOTA_RESET === 'true';
 const authSessions = new Map();
 const quotaByUserDay = new Map();
+const hairTryOnJobs = new Map();
+const hairTryOnJobTtlMs = 45 * 60 * 1000;
 
 function shortText(value, max = 80, fallback = '') {
   return String(value || fallback).trim().replace(/\s+/g, ' ').slice(0, max);
@@ -410,6 +412,25 @@ function consumeQuota(userId, amount) {
 function resetQuota(userId) {
   quotaByUserDay.delete(`${userId}:${todayKey()}`);
   return quotaState(userId);
+}
+
+function pruneHairTryOnJobs() {
+  const now = Date.now();
+  for (const [id, job] of hairTryOnJobs) {
+    if (now - job.createdAt > hairTryOnJobTtlMs) hairTryOnJobs.delete(id);
+  }
+}
+
+function visibleHairTryOnJob(job) {
+  return {
+    jobId: job.id,
+    status: job.status,
+    result: job.result,
+    error: job.error,
+    quota: job.quota,
+    createdAt: job.createdAt,
+    updatedAt: job.updatedAt
+  };
 }
 
 async function createWechatSession(code) {
@@ -1485,6 +1506,7 @@ async function serveStatic(req, res) {
 const server = createServer(async (req, res) => {
   const requestId = crypto.randomUUID().slice(0, 8);
   const startedAt = Date.now();
+  const requestUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   console.log(`[request:${requestId}] ${req.method} ${req.url} start`);
   res.on('finish', () => {
     console.log(`[request:${requestId}] ${req.method} ${req.url} ${res.statusCode} ${Date.now() - startedAt}ms`);
@@ -1497,7 +1519,7 @@ const server = createServer(async (req, res) => {
       return;
     }
 
-    if (req.method === 'POST' && req.url === '/api/hair-card') {
+    if (req.method === 'POST' && requestUrl.pathname === '/api/hair-card') {
       const body = await readBody(req);
       const payload = JSON.parse(body || '{}');
       const result = await createHairVariants(payload.image, { limit: payload.limit });
@@ -1505,7 +1527,7 @@ const server = createServer(async (req, res) => {
       return;
     }
 
-    if (req.method === 'POST' && req.url === '/api/hair-recommendation') {
+    if (req.method === 'POST' && requestUrl.pathname === '/api/hair-recommendation') {
       const body = await readBody(req);
       const payload = JSON.parse(body || '{}');
       console.log(`[hair-recommendation] provider=${analysisProvider} count=${payload.count || 5}`);
@@ -1518,7 +1540,7 @@ const server = createServer(async (req, res) => {
       return;
     }
 
-    if (req.method === 'POST' && req.url === '/api/aesthetic-card') {
+    if (req.method === 'POST' && requestUrl.pathname === '/api/aesthetic-card') {
       const body = await readBody(req);
       const payload = JSON.parse(body || '{}');
       const result = await createAestheticCard(payload.image, payload.metrics || {});
@@ -1526,7 +1548,7 @@ const server = createServer(async (req, res) => {
       return;
     }
 
-    if (req.method === 'POST' && req.url === '/api/aesthetic-tryon') {
+    if (req.method === 'POST' && requestUrl.pathname === '/api/aesthetic-tryon') {
       const body = await readBody(req);
       const payload = JSON.parse(body || '{}');
       const result = await createAestheticTryOns(payload.image, payload.looks || [], { limit: payload.limit, genderPresentation: payload.genderPresentation });
@@ -1534,7 +1556,7 @@ const server = createServer(async (req, res) => {
       return;
     }
 
-    if (req.method === 'POST' && req.url === '/api/hair-tryon') {
+    if (req.method === 'POST' && requestUrl.pathname === '/api/hair-tryon') {
       const body = await readBody(req);
       const payload = JSON.parse(body || '{}');
       const user = sessionUser(req);
@@ -1552,7 +1574,71 @@ const server = createServer(async (req, res) => {
       return;
     }
 
-    if (req.method === 'POST' && req.url === '/api/auth/wechat-login') {
+    if (req.method === 'POST' && requestUrl.pathname === '/api/hair-tryon-job') {
+      pruneHairTryOnJobs();
+      const body = await readBody(req);
+      const payload = JSON.parse(body || '{}');
+      const user = sessionUser(req);
+      const requested = Math.max(1, Math.min(15, Number(payload.limit || (payload.recommendations || []).length || tryOnLimit)));
+      const labels = (payload.recommendations || []).map((style) => style.label).filter(Boolean).join('、');
+      console.log(`[hair-tryon-job] provider=${imageProvider} requested=${requested} styles=${labels || '-'}`);
+      if (user) consumeQuota(user.openid, requested);
+      const inputImage = payload.image || payload.imageUrl;
+      const image = (imageProvider === 'seedream' || imageProvider === 'ark') && /^https?:\/\//i.test(String(inputImage || ''))
+        ? inputImage
+        : await imageInputToDataUrl(inputImage);
+      const jobId = crypto.randomUUID();
+      const owner = user?.openid || '';
+      const job = {
+        id: jobId,
+        owner,
+        status: 'running',
+        result: null,
+        error: '',
+        quota: user ? quotaState(user.openid) : null,
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      };
+      hairTryOnJobs.set(jobId, job);
+      json(res, 202, visibleHairTryOnJob(job));
+
+      Promise.resolve().then(async () => {
+        console.log(`[hair-tryon-job:${jobId.slice(0, 8)}] start`);
+        const result = await createRecommendedTryOns(image, payload.recommendations || [], { limit: payload.limit });
+        if (user) result.quota = quotaState(user.openid);
+        job.status = 'done';
+        job.result = result;
+        job.quota = result.quota || job.quota;
+        job.updatedAt = Date.now();
+        console.log(`[hair-tryon-job:${jobId.slice(0, 8)}] done generated=${result.generated} failed=${result.failed}`);
+      }).catch((err) => {
+        job.status = 'failed';
+        job.error = err.message || String(err);
+        job.quota = user ? quotaState(user.openid) : job.quota;
+        job.updatedAt = Date.now();
+        console.error(`[hair-tryon-job:${jobId.slice(0, 8)}] failed: ${err.stack || err.message || String(err)}`);
+      });
+      return;
+    }
+
+    if (req.method === 'GET' && requestUrl.pathname === '/api/hair-tryon-job') {
+      pruneHairTryOnJobs();
+      const jobId = requestUrl.searchParams.get('id') || '';
+      const job = hairTryOnJobs.get(jobId);
+      const user = sessionUser(req);
+      if (!job) {
+        json(res, 404, { error: '生成任务不存在或已过期' });
+        return;
+      }
+      if (job.owner && user?.openid !== job.owner) {
+        json(res, 403, { error: '无权查看该生成任务' });
+        return;
+      }
+      json(res, 200, visibleHairTryOnJob(job));
+      return;
+    }
+
+    if (req.method === 'POST' && requestUrl.pathname === '/api/auth/wechat-login') {
       const body = await readBody(req, 128 * 1024);
       const payload = JSON.parse(body || '{}');
       const result = await createWechatSession(payload.code);
@@ -1560,7 +1646,7 @@ const server = createServer(async (req, res) => {
       return;
     }
 
-    if (req.method === 'GET' && req.url === '/api/quota') {
+    if (req.method === 'GET' && requestUrl.pathname === '/api/quota') {
       const user = sessionUser(req);
       if (!user) {
         json(res, 401, { error: '未登录' });
@@ -1570,7 +1656,7 @@ const server = createServer(async (req, res) => {
       return;
     }
 
-    if (req.method === 'POST' && req.url === '/api/dev/reset-quota') {
+    if (req.method === 'POST' && requestUrl.pathname === '/api/dev/reset-quota') {
       if (!enableDevQuotaReset) {
         json(res, 404, { error: 'Not found' });
         return;
