@@ -164,6 +164,76 @@ const recommendationCatalog = [
     reason: '层次能修饰头脸比例，保留自然少年感。'
   },
   {
+    id: 'male-french-crop',
+    label: '法式前刺',
+    gender: 'male',
+    shapes: ['oval', 'round', 'square', 'oblong'],
+    volume: ['thin', 'medium', 'thick'],
+    texture: ['straight', 'coarse', 'soft'],
+    vibe: '干净利落',
+    reason: '短刘海和侧区渐变让脸部更清爽。'
+  },
+  {
+    id: 'male-korean-comma',
+    label: '韩式逗号刘海',
+    gender: 'male',
+    shapes: ['oval', 'heart', 'oblong', 'diamond'],
+    volume: ['medium', 'thick'],
+    texture: ['soft', 'straight', 'wavy'],
+    vibe: '柔和韩系',
+    reason: '逗号弧度修饰额头，气质更温和。'
+  },
+  {
+    id: 'male-clean-taper-flow',
+    label: '清爽渐变流线',
+    gender: 'male',
+    shapes: ['oval', 'round', 'square', 'diamond'],
+    volume: ['thin', 'medium', 'thick'],
+    texture: ['straight', 'soft', 'coarse'],
+    vibe: '自然耐看',
+    reason: '低渐变侧区控量，整体更精神。'
+  },
+  {
+    id: 'male-short-textured-crop',
+    label: '男生短碎盖',
+    gender: 'male',
+    shapes: ['oval', 'round', 'square', 'heart'],
+    volume: ['thin', 'medium', 'thick'],
+    texture: ['straight', 'coarse', 'soft'],
+    vibe: '少年清爽',
+    reason: '短碎层次压住厚重感，日常好打理。'
+  },
+  {
+    id: 'male-side-part-texture',
+    label: '侧分纹理短发',
+    gender: 'male',
+    shapes: ['oval', 'square', 'diamond', 'oblong'],
+    volume: ['medium', 'thick'],
+    texture: ['straight', 'soft', 'wavy'],
+    vibe: '利落成熟',
+    reason: '侧分线条修饰脸宽，轮廓更清晰。'
+  },
+  {
+    id: 'male-hongkong-37-part',
+    label: '港风三七分',
+    gender: 'male',
+    shapes: ['oval', 'heart', 'diamond', 'oblong'],
+    volume: ['medium', 'thick'],
+    texture: ['soft', 'straight', 'wavy'],
+    vibe: '复古精致',
+    reason: '三七弧度增加发量感，提升气质。'
+  },
+  {
+    id: 'male-clean-buzz-crop',
+    label: '清爽寸感短发',
+    gender: 'male',
+    shapes: ['oval', 'square', 'diamond'],
+    volume: ['medium', 'thick'],
+    texture: ['straight', 'coarse', 'soft'],
+    vibe: '硬朗干净',
+    reason: '短寸强化五官轮廓，适合清爽路线。'
+  },
+  {
     id: 'female-wispy-bangs',
     label: 'wispy bangs',
     gender: 'female',
@@ -298,6 +368,13 @@ const recommendationCatalog = [
 const recommendationPrompts = {
   'male-american-textured-fringe': 'American textured fringe for men, short-to-medium top pushed forward into piecey spiky forward texture, lifted roots, matte finish, low taper or subtle drop fade sides, clean temples, natural dark hair, realistic masculine hairline, NOT slicked back, NOT bowl cut',
   'male-soft-wolf-cut': 'male soft wolf cut, layered shag-wolf silhouette, airy crown volume, textured side layers, slightly longer nape, face-framing fringe, wearable salon finish, natural dark hair, realistic masculine hairline, NOT messy cosplay hair',
+  'male-french-crop': 'French crop for men, cropped textured top with short forward fringe, neat blunt-but-soft hairline, low fade or taper sides, compact clean masculine silhouette, matte salon texture',
+  'male-korean-comma': 'Korean comma hair for men, soft C-shaped comma fringe curving beside forehead, airy root volume, natural side part, smooth dark hair, gentle K-style flow, realistic masculine hairline',
+  'male-clean-taper-flow': 'clean taper flow haircut for men, natural side volume, low taper sides, tidy temples, medium-short top with easy movement, low-maintenance premium salon finish, realistic dark hair',
+  'male-short-textured-crop': 'short textured crop for men, neat broken fringe, compact top layers, clean natural sides, lightweight matte texture, youthful fresh salon finish, realistic masculine hairline',
+  'male-side-part-texture': 'side-parted textured short haircut for men, subtle volume at roots, clean taper sides, natural side sweep, refined mature salon styling, realistic dark hair and temples',
+  'male-hongkong-37-part': 'Hong Kong style 7/3 side part for men, retro natural side-swept volume, soft glossy dark hair, clean neckline, refined cinematic masculine look, realistic hairline',
+  'male-clean-buzz-crop': 'clean buzz crop for men, short cropped top, tidy faded sides, sharp but natural hairline, masculine minimal haircut, realistic scalp density and temple transition',
   'female-wispy-bangs': 'wispy bangs for women, transparent feathered see-through fringe, soft forehead coverage, airy face-framing layers, natural root volume, glossy realistic strands, feminine light salon finish',
   'female-hot-girl-bob': 'hot-girl bob for women, glossy jaw-to-collarbone bob, slightly tousled texture, face-hugging curve, optional side part, chic confident girl-crush mood, realistic hairline, not helmet-like',
   'real-layered-brown': 'soft layered medium-long salon waves, warm brunette tone, face-framing layers around cheekbones and jaw, airy crown volume, natural realistic hairline and temples',
@@ -694,6 +771,8 @@ function recommendationText(style) {
 }
 
 function styleGenderBucket(style) {
+  const catalogStyle = recommendationById(style.id);
+  if (catalogStyle?.gender) return catalogStyle.gender;
   const text = recommendationText(style);
   if (/美式前刺|前刺|american textured fringe|french crop|法式前刺|逗号|comma|male soft wolf|男/.test(text)) return 'male';
   if (/wispy|辣妹|波波|bob|长卷|层次卷|锁骨|空气刘海|八字刘海|齐肩|long waves|lob|female|女/.test(text)) return 'female';
@@ -704,6 +783,7 @@ function isGenderCompatible(style, bucket) {
   const styleBucket = styleGenderBucket(style);
   if (bucket === 'male') return styleBucket !== 'female';
   if (bucket === 'female') return styleBucket !== 'male';
+  if (bucket === 'uncertain') return styleBucket !== 'female';
   return true;
 }
 
@@ -723,7 +803,7 @@ function enforceTrendRecommendationRules(items, analysis, fallback, count = 5) {
     ? ['male-american-textured-fringe', 'male-soft-wolf-cut']
     : bucket === 'female'
       ? ['female-wispy-bangs', 'female-hot-girl-bob']
-      : ['male-american-textured-fringe', 'female-wispy-bangs'];
+      : ['male-american-textured-fringe', 'male-soft-wolf-cut', 'best-textured-mid', 'ok-wet-back'];
   const fallbackPool = [
     ...forcedIds,
     ...fallback.recommendations.map((item) => item.id),
@@ -759,6 +839,13 @@ function enforceTrendRecommendationRules(items, analysis, fallback, count = 5) {
     rank: index + 1,
     genderPresentation: item.genderPresentation || bucket
   }));
+}
+
+function recommendationSummary(analysis, recommendations, warning = '') {
+  const labels = recommendations.slice(0, 6).map((style) => style.label).join('、');
+  const prefix = warning ? 'AI分析失败，已使用保守规则；' : '';
+  const gender = analysis.genderLabel && analysis.genderLabel !== '未确定' ? `${analysis.genderLabel}，` : '';
+  return shortText(`${prefix}${gender}优先推荐 ${labels}。`, 90);
 }
 
 function normalizeRecommendation(payload, fallback, count = 5) {
@@ -798,8 +885,16 @@ function normalizeRecommendation(payload, fallback, count = 5) {
     summary: shortText(payload.analysis?.summary, 90, fallback.analysis.summary || '')
   };
   const recommendations = enforceTrendRecommendationRules(picked, analysis, fallback, count);
+  const recommendationLabels = recommendations.map((style) => style.label);
+  const summaryMentionsMismatch = recommendationCatalog
+    .map((style) => style.label)
+    .some((label) => analysis.summary.includes(label) && !recommendationLabels.includes(label));
+  if (!analysis.summary || payload.warning || summaryMentionsMismatch) {
+    analysis.summary = recommendationSummary(analysis, recommendations, payload.warning);
+  }
   return {
     provider: payload.provider || analysisProvider,
+    warning: payload.warning || '',
     analysis,
     recommendations
   };
@@ -904,7 +999,9 @@ async function createOpenAiRecommendation(imageDataUrl, metrics, count = 5) {
 async function createHairRecommendation(imageDataUrl, metrics = {}, options = {}) {
   const count = Math.max(1, Math.min(15, Number(options.count || 5)));
   const fallback = localHairRecommendation(metrics, count);
-  if (analysisProvider === 'local') return fallback;
+  if (analysisProvider === 'local') {
+    return normalizeRecommendation({ ...fallback, provider: 'local' }, fallback, count);
+  }
   try {
     const aiPayload = analysisProvider === 'openai'
       ? await createOpenAiRecommendation(imageDataUrl, metrics, count)
@@ -913,11 +1010,12 @@ async function createHairRecommendation(imageDataUrl, metrics = {}, options = {}
         : await createGeminiRecommendation(imageDataUrl, metrics, count);
     return normalizeRecommendation({ ...aiPayload, provider: analysisProvider }, fallback, count);
   } catch (err) {
-    return {
+    console.error(`[hair-recommendation] ${analysisProvider} failed: ${err.stack || err.message || String(err)}`);
+    return normalizeRecommendation({
       ...fallback,
       provider: `${analysisProvider}-fallback`,
       warning: err.message || String(err)
-    };
+    }, fallback, count);
   }
 }
 
@@ -1715,9 +1813,7 @@ const server = createServer(async (req, res) => {
       const payload = JSON.parse(body || '{}');
       console.log(`[hair-recommendation] provider=${analysisProvider} count=${payload.count || 5}`);
       const inputImage = payload.image || payload.imageUrl;
-      const image = analysisProvider === 'ark' && /^https?:\/\//i.test(String(inputImage || ''))
-        ? inputImage
-        : await imageInputToDataUrl(inputImage);
+      const image = await imageInputToDataUrl(inputImage);
       const result = await createHairRecommendation(image, payload.metrics || {}, { count: payload.count });
       json(res, 200, result);
       return;
