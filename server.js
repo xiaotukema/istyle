@@ -61,7 +61,7 @@ const liblibModel = process.env.LIBLIB_IMAGE_MODEL || 'star-3-alpha';
 const apiBase = process.env.OPENAI_API_BASE || 'https://api.openai.com/v1';
 const geminiApiBase = process.env.GEMINI_API_BASE || 'https://generativelanguage.googleapis.com/v1beta';
 const arkApiBase = process.env.ARK_API_BASE || 'https://ark.cn-beijing.volces.com/api/v3';
-const arkImageModel = process.env.ARK_IMAGE_MODEL || 'doubao-seedream-5-0-260128';
+const arkImageModel = process.env.ARK_IMAGE_MODEL || 'doubao-seedream-4-5-251128';
 const agnesApiBase = process.env.AGNES_API_BASE || 'https://apihub.agnes-ai.com/v1';
 const liblibApiBase = process.env.LIBLIB_API_BASE || 'https://openapi.liblibai.cloud';
 const variantLimit = Number(process.env.HAIR_VARIANT_LIMIT || (imageProvider === 'liblib' ? 5 : 15));
