@@ -279,10 +279,18 @@ const mimeTypes = {
   '.svg': 'image/svg+xml'
 };
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET,POST,HEAD,OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type,Authorization',
+  'Access-Control-Max-Age': '86400'
+};
+
 function json(res, status, payload) {
   res.writeHead(status, {
     'Content-Type': 'application/json; charset=utf-8',
-    'Cache-Control': 'no-store'
+    'Cache-Control': 'no-store',
+    ...corsHeaders
   });
   res.end(JSON.stringify(payload));
 }
@@ -1335,17 +1343,24 @@ async function serveStatic(req, res) {
     const file = await readFile(filePath);
     res.writeHead(200, {
       'Content-Type': mimeTypes[extname(filePath)] || 'application/octet-stream',
-      'Cache-Control': 'no-store'
+      'Cache-Control': 'no-store',
+      ...corsHeaders
     });
     res.end(file);
   } catch (err) {
-    res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+    res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8', ...corsHeaders });
     res.end('Not found');
   }
 }
 
 const server = createServer(async (req, res) => {
   try {
+    if (req.method === 'OPTIONS') {
+      res.writeHead(204, corsHeaders);
+      res.end();
+      return;
+    }
+
     if (req.method === 'POST' && req.url === '/api/hair-card') {
       const body = await readBody(req);
       const payload = JSON.parse(body || '{}');

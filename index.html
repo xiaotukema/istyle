@@ -804,6 +804,18 @@
       let startAiRecommendButton = null;
       let toastTimer = 0;
       const hairImages = new Map();
+      const apiOrigin = window.location.protocol === 'file:' ? 'http://127.0.0.1:8000' : '';
+
+      async function apiFetch(path, options = {}) {
+        try {
+          return await fetch(`${apiOrigin}${path}`, options);
+        } catch (err) {
+          if (window.location.protocol === 'file:') {
+            throw new Error('本地生成服务未启动或不可访问，请确认 http://127.0.0.1:8000/ 正在运行。');
+          }
+          throw err;
+        }
+      }
 
       function setStatus(main, sub = '', error = false) {
         statusEl.className = error ? 'brand error' : 'brand';
@@ -1199,7 +1211,7 @@
         const image = captureAnalysisFrame();
         if (!image) throw new Error('摄像头画面尚未准备好');
         lastRecommendationImage = image;
-        const response = await fetch('/api/hair-recommendation', {
+        const response = await apiFetch('/api/hair-recommendation', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ image, metrics, count: TOTAL_TRYON_COUNT })
@@ -1236,7 +1248,7 @@
       }
 
       async function requestTryOnImages(image, recommendations, limit = recommendations.length) {
-        const response = await fetch('/api/hair-tryon', {
+        const response = await apiFetch('/api/hair-tryon', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ image, recommendations, limit })
@@ -1262,6 +1274,7 @@
           setStatus('正在生成高清试戴图', pending.length <= INITIAL_TRYON_COUNT ? '先生成 5 款，完成后可继续推荐更多。' : `正在补充 ${pending.length} 款更多发型。`);
         }
         let failed = 0;
+        const failedMessages = [];
         try {
           for (let i = 0; i < pending.length; i += 1) {
             const style = pending[i];
@@ -1284,6 +1297,7 @@
               }
             } else {
               failed += 1;
+              failedMessages.push(generated?.error || `${style.label} 生成失败`);
               hairStyles = hairStyles.map((item) => item.id === style.id
                 ? { ...item, tryonError: generated?.error || item.tryonError || '生成失败' }
                 : item);
@@ -1299,11 +1313,14 @@
             }
           }
           if (!generatedStyleCount()) {
+            const message = failedMessages[0] || '生成服务返回失败，请稍后重试。';
             tryonPanel.hidden = false;
             tryonImage.hidden = true;
             tryonLoading.hidden = true;
             document.body.classList.remove('tryon-ready');
-            tryonCaption.innerHTML = `<strong>高清试戴图生成失败</strong><span>生成服务返回失败，请稍后重试。</span>`;
+            tryonCaption.innerHTML = `<strong>高清试戴图生成失败</strong><span>${message}</span>`;
+            setStatus('高清试戴图生成失败', message, true);
+            return;
           }
           if (reveal) setStatus('高清试戴图已生成', `已生成 ${generatedStyleCount()} 款${failed ? ` · ${failed} 款失败` : ''} · ${currentStyleLabel()}`);
         } catch (err) {
