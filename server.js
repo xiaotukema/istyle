@@ -72,7 +72,9 @@ const enableDevQuotaReset = process.env.ENABLE_DEV_QUOTA_RESET === 'true';
 const authSessions = new Map();
 const quotaByUserDay = new Map();
 const hairTryOnJobs = new Map();
+const hairTryOnHistory = [];
 const hairTryOnJobTtlMs = 45 * 60 * 1000;
+const hairTryOnHistoryLimit = 80;
 
 function shortText(value, max = 80, fallback = '') {
   return String(value || fallback).trim().replace(/\s+/g, ' ').slice(0, max);
@@ -431,6 +433,50 @@ function visibleHairTryOnJob(job) {
     createdAt: job.createdAt,
     updatedAt: job.updatedAt
   };
+}
+
+function visibleHairTryOnHistoryItem(item) {
+  return {
+    id: item.id,
+    jobId: item.jobId,
+    owner: item.owner ? 'wechat-user' : '',
+    mode: item.mode,
+    provider: item.provider,
+    generated: item.generated,
+    failed: item.failed,
+    variants: item.variants,
+    createdAt: item.createdAt
+  };
+}
+
+function recordHairTryOnResult({ jobId = '', owner = '', mode = 'sync', result }) {
+  if (!result) return;
+  const item = {
+    id: crypto.randomUUID(),
+    jobId,
+    owner,
+    mode,
+    provider: result.provider || imageProvider,
+    generated: Number(result.generated || 0),
+    failed: Number(result.failed || 0),
+    variants: (result.variants || []).map((variant) => ({
+      id: variant.id,
+      label: variant.label,
+      image: variant.image || '',
+      error: variant.error || ''
+    })),
+    createdAt: Date.now()
+  };
+  hairTryOnHistory.unshift(item);
+  hairTryOnHistory.splice(hairTryOnHistoryLimit);
+
+  for (const variant of item.variants) {
+    if (variant.image) {
+      console.log(`[hair-tryon-result] ${variant.label} image=${variant.image}`);
+    } else if (variant.error) {
+      console.log(`[hair-tryon-result] ${variant.label} error=${variant.error}`);
+    }
+  }
 }
 
 async function createWechatSession(code) {
@@ -1570,6 +1616,7 @@ const server = createServer(async (req, res) => {
         : await imageInputToDataUrl(inputImage);
       const result = await createRecommendedTryOns(image, payload.recommendations || [], { limit: payload.limit });
       if (user) result.quota = quotaState(user.openid);
+      recordHairTryOnResult({ owner: user?.openid || '', mode: 'sync', result });
       json(res, 200, result);
       return;
     }
@@ -1610,6 +1657,7 @@ const server = createServer(async (req, res) => {
         job.result = result;
         job.quota = result.quota || job.quota;
         job.updatedAt = Date.now();
+        recordHairTryOnResult({ jobId, owner, mode: 'async', result });
         console.log(`[hair-tryon-job:${jobId.slice(0, 8)}] done generated=${result.generated} failed=${result.failed}`);
       }).catch((err) => {
         job.status = 'failed';
@@ -1635,6 +1683,20 @@ const server = createServer(async (req, res) => {
         return;
       }
       json(res, 200, visibleHairTryOnJob(job));
+      return;
+    }
+
+    if (req.method === 'GET' && requestUrl.pathname === '/api/hair-tryon-history') {
+      if (!enableDevQuotaReset) {
+        json(res, 404, { error: 'Not found' });
+        return;
+      }
+      const user = sessionUser(req);
+      const items = hairTryOnHistory
+        .filter((item) => !item.owner || !user || item.owner === user.openid)
+        .slice(0, Math.max(1, Math.min(80, Number(requestUrl.searchParams.get('limit') || 20))))
+        .map(visibleHairTryOnHistoryItem);
+      json(res, 200, { items });
       return;
     }
 
