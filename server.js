@@ -334,6 +334,14 @@ async function imageInputToDataUrl(input) {
   return `data:${mimeType.replace('image/jpg', 'image/jpeg')};base64,${buffer.toString('base64')}`;
 }
 
+async function fetchGemini(modelName, options, label) {
+  try {
+    return await fetch(`${geminiApiBase}/models/${modelName}:generateContent`, options);
+  } catch (err) {
+    throw new Error(`${label}: 云托管无法连接 Gemini API（${geminiApiBase}）。如果服务部署在国内地域，请改用可访问 Google 的后端/代理，或临时切换到国内可访问的图片生成服务。原始错误：${err.message || String(err)}`);
+  }
+}
+
 function dataUrlToBlob(dataUrl) {
   const match = /^data:(image\/(?:png|jpeg|jpg|webp));base64,(.+)$/i.exec(dataUrl || '');
   if (!match) {
@@ -579,7 +587,7 @@ function normalizeRecommendation(payload, fallback, count = 5) {
 async function createGeminiRecommendation(imageDataUrl, metrics, count = 5) {
   if (!process.env.GEMINI_API_KEY) throw new Error('缺少 GEMINI_API_KEY。');
   const input = parseDataUrl(imageDataUrl);
-  const response = await fetch(`${geminiApiBase}/models/${analysisModel}:generateContent`, {
+  const response = await fetchGemini(analysisModel, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -597,7 +605,7 @@ async function createGeminiRecommendation(imageDataUrl, metrics, count = 5) {
         temperature: 0.35
       }
     })
-  });
+  }, 'Gemini 推荐失败');
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
     throw new Error(payload.error?.message || `Gemini 推荐失败：HTTP ${response.status}`);
@@ -854,7 +862,7 @@ function normalizeAestheticCard(payload = {}, fallback = localAestheticCard()) {
 async function createGeminiAestheticCard(imageDataUrl, metrics) {
   if (!process.env.GEMINI_API_KEY) throw new Error('缺少 GEMINI_API_KEY。');
   const input = parseDataUrl(imageDataUrl);
-  const response = await fetch(`${geminiApiBase}/models/${aestheticAnalysisModel}:generateContent`, {
+  const response = await fetchGemini(aestheticAnalysisModel, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -872,7 +880,7 @@ async function createGeminiAestheticCard(imageDataUrl, metrics) {
         temperature: 0.45
       }
     })
-  });
+  }, 'Gemini 形象鉴定失败');
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
     throw new Error(payload.error?.message || `Gemini 形象鉴定失败：HTTP ${response.status}`);
@@ -940,7 +948,7 @@ async function createGeminiAestheticTryOn(imageDataUrl, look) {
   }
 
   const input = parseDataUrl(imageDataUrl);
-  const response = await fetch(`${geminiApiBase}/models/${aestheticGeminiModel}:generateContent`, {
+  const response = await fetchGemini(aestheticGeminiModel, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -962,7 +970,7 @@ async function createGeminiAestheticTryOn(imageDataUrl, look) {
         responseModalities: ['IMAGE']
       }
     })
-  });
+  }, `${look.label}: Gemini 试穿图生成失败`);
 
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
@@ -1266,7 +1274,7 @@ async function createGeminiStyleVariant(imageDataUrl, style) {
   }
 
   const input = parseDataUrl(imageDataUrl);
-  const response = await fetch(`${geminiApiBase}/models/${geminiModel}:generateContent`, {
+  const response = await fetchGemini(geminiModel, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -1288,7 +1296,7 @@ async function createGeminiStyleVariant(imageDataUrl, style) {
         responseModalities: ['IMAGE']
       }
     })
-  });
+  }, `${style.label}: Gemini 图片编辑失败`);
 
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {

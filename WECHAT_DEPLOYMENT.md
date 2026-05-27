@@ -11,6 +11,7 @@ Required environment variables:
 
 ```text
 GEMINI_API_KEY=...
+GEMINI_API_BASE=https://generativelanguage.googleapis.com/v1beta
 IMAGE_PROVIDER=gemini
 ANALYSIS_PROVIDER=gemini
 GEMINI_IMAGE_MODEL=gemini-3-pro-image-preview
