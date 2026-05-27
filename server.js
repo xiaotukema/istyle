@@ -1483,6 +1483,13 @@ async function serveStatic(req, res) {
 }
 
 const server = createServer(async (req, res) => {
+  const requestId = crypto.randomUUID().slice(0, 8);
+  const startedAt = Date.now();
+  console.log(`[request:${requestId}] ${req.method} ${req.url} start`);
+  res.on('finish', () => {
+    console.log(`[request:${requestId}] ${req.method} ${req.url} ${res.statusCode} ${Date.now() - startedAt}ms`);
+  });
+
   try {
     if (req.method === 'OPTIONS') {
       res.writeHead(204, corsHeaders);
@@ -1501,6 +1508,7 @@ const server = createServer(async (req, res) => {
     if (req.method === 'POST' && req.url === '/api/hair-recommendation') {
       const body = await readBody(req);
       const payload = JSON.parse(body || '{}');
+      console.log(`[hair-recommendation] provider=${analysisProvider} count=${payload.count || 5}`);
       const inputImage = payload.image || payload.imageUrl;
       const image = analysisProvider === 'ark' && /^https?:\/\//i.test(String(inputImage || ''))
         ? inputImage
@@ -1531,6 +1539,8 @@ const server = createServer(async (req, res) => {
       const payload = JSON.parse(body || '{}');
       const user = sessionUser(req);
       const requested = Math.max(1, Math.min(15, Number(payload.limit || (payload.recommendations || []).length || tryOnLimit)));
+      const labels = (payload.recommendations || []).map((style) => style.label).filter(Boolean).join('、');
+      console.log(`[hair-tryon] provider=${imageProvider} requested=${requested} styles=${labels || '-'}`);
       if (user) consumeQuota(user.openid, requested);
       const inputImage = payload.image || payload.imageUrl;
       const image = (imageProvider === 'seedream' || imageProvider === 'ark') && /^https?:\/\//i.test(String(inputImage || ''))

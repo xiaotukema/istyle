@@ -1,5 +1,13 @@
 const app = getApp();
 
+function toError(err, fallback = '请求失败') {
+  if (err instanceof Error) return err;
+  const message = err && (err.errMsg || err.message || err.error)
+    ? `${err.errMsg || err.message || err.error}${err.errCode ? ` (${err.errCode})` : ''}`
+    : fallback;
+  return new Error(message);
+}
+
 function ensureCloudReady() {
   if (!app.globalData.useCloudContainer || !wx.cloud || !wx.cloud.callContainer) return;
   if (app.globalData.cloudReady) return;
@@ -31,10 +39,10 @@ function uploadCapture(filePath) {
               imageUrl: item.tempFileURL
             });
           },
-          fail: reject
+          fail: (err) => reject(toError(err, '获取图片临时地址失败'))
         });
       },
-      fail: reject
+      fail: (err) => reject(toError(err, '上传图片失败'))
     });
   });
 }
@@ -59,7 +67,9 @@ function request(path, options = {}) {
             reject(new Error(res.data && res.data.error ? res.data.error : `请求失败：${res.statusCode}`));
           }
         },
-        fail: reject
+        fail(err) {
+          reject(toError(err, '云托管请求失败'));
+        }
       });
     });
   }
@@ -80,7 +90,9 @@ function request(path, options = {}) {
           reject(new Error(res.data && res.data.error ? res.data.error : `请求失败：${res.statusCode}`));
         }
       },
-      fail: reject
+      fail(err) {
+        reject(toError(err, '请求失败'));
+      }
     });
   });
 }
@@ -108,7 +120,9 @@ function login() {
           reject(err);
         }
       },
-      fail: reject
+      fail(err) {
+        reject(toError(err, '微信登录失败'));
+      }
     });
   });
 }

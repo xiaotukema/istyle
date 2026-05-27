@@ -71,39 +71,71 @@ Page({
   },
 
   async generateTryOns(styles) {
-    this.setData({ loading: true, loadingText: `正在生成 ${styles.length} 款试戴图` });
-    const payload = await request('/api/hair-tryon', {
-      method: 'POST',
-      data: {
-        image: this.data.image,
-        recommendations: styles,
-        limit: styles.length
-      }
-    });
-    const byId = new Map((payload.variants || []).map((item) => [item.id, item]));
+    const pendingStyles = (styles || []).filter((style) => style && !style.tryonImage);
     const errors = [];
-    const nextStyles = this.data.styles.map((style) => {
-      const generated = byId.get(style.id);
-      if (generated && generated.image) return { ...style, tryonImage: generated.image, tryonError: '' };
-      if (generated && generated.error) {
-        errors.push(generated.error);
-        return { ...style, tryonError: generated.error };
+
+    for (let index = 0; index < pendingStyles.length; index += 1) {
+      const style = pendingStyles[index];
+      this.setData({
+        loading: true,
+        loadingText: `正在生成第 ${index + 1}/${pendingStyles.length} 款试戴图：${style.label}`
+      });
+
+      try {
+        const payload = await request('/api/hair-tryon', {
+          method: 'POST',
+          data: {
+            image: this.data.image,
+            recommendations: [style],
+            limit: 1
+          }
+        });
+        const generated = (payload.variants || [])[0] || {};
+        if (generated.error) errors.push(generated.error);
+
+        const nextStyles = this.data.styles.map((item) => {
+          if (item.id !== style.id) return item;
+          if (generated.image) return { ...item, tryonImage: generated.image, tryonError: '' };
+          if (generated.error) return { ...item, tryonError: generated.error };
+          return { ...item, tryonError: '试戴图生成失败，请查看云托管运行日志。' };
+        });
+        const firstImageIndex = nextStyles.findIndex((item) => item.tryonImage);
+        const generatedIndex = nextStyles.findIndex((item) => item.id === style.id && item.tryonImage);
+        const activeIndex = generatedIndex >= 0 && !this.data.currentImage
+          ? generatedIndex
+          : firstImageIndex >= 0
+            ? this.data.currentIndex
+            : this.data.currentIndex;
+        const activeStyle = nextStyles[activeIndex] || {};
+
+        this.setData({
+          styles: nextStyles,
+          currentIndex: activeIndex,
+          currentStyle: activeStyle,
+          currentImage: activeStyle.tryonImage || this.data.currentImage,
+          tryonError: firstImageIndex >= 0 ? '' : (errors[0] || ''),
+          quota: payload.quota || this.data.quota,
+          remainingCount: Math.max(0, TOTAL_COUNT - nextStyles.length)
+        });
+      } catch (err) {
+        const message = err.message || '生成失败';
+        errors.push(message);
+        const nextStyles = this.data.styles.map((item) => (
+          item.id === style.id ? { ...item, tryonError: message } : item
+        ));
+        this.setData({
+          styles: nextStyles,
+          tryonError: this.data.currentImage ? '' : message,
+          remainingCount: Math.max(0, TOTAL_COUNT - nextStyles.length)
+        });
+        wx.showToast({ title: message.slice(0, 30), icon: 'none' });
+        break;
       }
-      return style;
-    });
-    const firstIndex = nextStyles.findIndex((style) => style.tryonImage);
-    const activeIndex = firstIndex >= 0 ? firstIndex : this.data.currentIndex;
-    this.setData({
-      styles: nextStyles,
-      currentIndex: activeIndex,
-      currentStyle: nextStyles[activeIndex] || {},
-      currentImage: nextStyles[activeIndex]?.tryonImage || '',
-      tryonError: firstIndex >= 0 ? '' : (errors[0] || '试戴图生成失败，请查看云托管运行日志。'),
-      quota: payload.quota || this.data.quota,
-      remainingCount: Math.max(0, TOTAL_COUNT - nextStyles.length)
-    });
-    if (errors.length && firstIndex < 0) {
-      wx.showToast({ title: errors[0].slice(0, 30), icon: 'none' });
+    }
+
+    const hasImage = this.data.styles.some((style) => style.tryonImage);
+    if (!hasImage && errors.length) {
+      this.setData({ tryonError: errors[0] });
     }
   },
 
