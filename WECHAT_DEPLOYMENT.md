@@ -19,6 +19,7 @@ ARK_IMAGE_SIZE=2K
 ANALYSIS_MODEL=doubao-seed-2-0-pro-260215
 DAILY_HAIR_LIMIT=11
 HAIR_VARIANT_CONCURRENCY=1
+ENABLE_DEV_QUOTA_RESET=false
 ```
 
 When running through CloudBase Run, the backend reads the WeChat openid from

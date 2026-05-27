@@ -122,6 +122,16 @@ Page({
     }
   },
 
+  async resetQuota() {
+    try {
+      const payload = await request('/api/dev/reset-quota', { method: 'POST' });
+      this.setData({ quota: payload.quota || { used: 0, remaining: TOTAL_COUNT, limit: TOTAL_COUNT } });
+      wx.showToast({ title: '测试次数已重置' });
+    } catch (err) {
+      wx.showToast({ title: err.message || '重置失败', icon: 'none' });
+    }
+  },
+
   selectStyle(event) {
     const index = Number(event.currentTarget.dataset.index || 0);
     const style = this.data.styles[index] || {};

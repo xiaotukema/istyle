@@ -68,6 +68,7 @@ const variantLimit = Number(process.env.HAIR_VARIANT_LIMIT || (imageProvider ===
 const variantConcurrency = Number(process.env.HAIR_VARIANT_CONCURRENCY || (imageProvider === 'liblib' ? 1 : 3));
 const tryOnLimit = Number(process.env.HAIR_TRYON_LIMIT || 5);
 const dailyHairLimit = Number(process.env.DAILY_HAIR_LIMIT || 11);
+const enableDevQuotaReset = process.env.ENABLE_DEV_QUOTA_RESET === 'true';
 const authSessions = new Map();
 const quotaByUserDay = new Map();
 
@@ -403,6 +404,11 @@ function consumeQuota(userId, amount) {
     throw err;
   }
   quotaByUserDay.set(state.key, state.used + amount);
+  return quotaState(userId);
+}
+
+function resetQuota(userId) {
+  quotaByUserDay.delete(`${userId}:${todayKey()}`);
   return quotaState(userId);
 }
 
@@ -1547,6 +1553,20 @@ const server = createServer(async (req, res) => {
         return;
       }
       json(res, 200, { quota: quotaState(user.openid) });
+      return;
+    }
+
+    if (req.method === 'POST' && req.url === '/api/dev/reset-quota') {
+      if (!enableDevQuotaReset) {
+        json(res, 404, { error: 'Not found' });
+        return;
+      }
+      const user = sessionUser(req);
+      if (!user) {
+        json(res, 401, { error: '未登录' });
+        return;
+      }
+      json(res, 200, { quota: resetQuota(user.openid) });
       return;
     }
 
