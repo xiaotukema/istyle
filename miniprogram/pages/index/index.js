@@ -16,15 +16,10 @@ Page({
     analysis: {},
     loading: false,
     loadingText: '',
-    cameraReady: false,
     remainingCount: TOTAL_COUNT
   },
 
   onLoad() {},
-
-  enableCamera() {
-    this.setData({ cameraReady: true });
-  },
 
   onCameraError(event) {
     wx.showToast({ title: event.detail && event.detail.errMsg ? event.detail.errMsg : '摄像头不可用', icon: 'none' });
@@ -50,11 +45,6 @@ Page({
 
   async startRecommend() {
     if (this.data.loading) return;
-    if (!this.data.cameraReady) {
-      this.enableCamera();
-      wx.showToast({ title: '摄像头开启后再开始推荐', icon: 'none' });
-      return;
-    }
     try {
       this.setData({ loading: true, loadingText: '正在分析并生成 5 款发型' });
       const image = await this.captureFrame();

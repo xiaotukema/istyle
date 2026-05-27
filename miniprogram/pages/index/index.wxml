@@ -1,9 +1,5 @@
 <view class="page">
-  <camera wx:if="{{cameraReady}}" class="camera" device-position="front" flash="off" binderror="onCameraError"></camera>
-  <view wx:else class="camera-placeholder">
-    <view class="placeholder-title">iStyle 发型试戴</view>
-    <view class="placeholder-subtitle">点击下方按钮开启摄像头后开始 AI 推荐</view>
-  </view>
+  <camera class="camera" device-position="front" flash="off" binderror="onCameraError"></camera>
 
   <view class="panel">
     <view class="title">实时发型试戴</view>
@@ -35,8 +31,7 @@
   </scroll-view>
 
   <view class="dock">
-    <button class="primary" bindtap="enableCamera" wx:if="{{!cameraReady}}">开启摄像头</button>
-    <button class="primary" bindtap="startRecommend" wx:elif="{{!styles.length}}" loading="{{loading}}">开始 AI 推荐</button>
+    <button class="primary" bindtap="startRecommend" wx:if="{{!styles.length}}" loading="{{loading}}">开始 AI 推荐</button>
     <button class="primary {{quota.remaining <= 0 || !remainingCount ? 'disabled' : ''}}" bindtap="recommendMore" wx:if="{{styles.length}}" loading="{{loading}}">{{remainingCount ? '推荐更多' : '今日已达上限'}}</button>
     <button class="secondary" bindtap="saveImage" wx:if="{{currentImage}}">保存截图</button>
   </view>
