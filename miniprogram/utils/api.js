@@ -1,7 +1,17 @@
 const app = getApp();
 
+function ensureCloudReady() {
+  if (!app.globalData.useCloudContainer || !wx.cloud || !wx.cloud.callContainer) return;
+  if (app.globalData.cloudReady) return;
+  wx.cloud.init({
+    env: app.globalData.cloudEnv || undefined
+  });
+  app.globalData.cloudReady = true;
+}
+
 function request(path, options = {}) {
   if (app.globalData.useCloudContainer && wx.cloud && wx.cloud.callContainer) {
+    ensureCloudReady();
     return new Promise((resolve, reject) => {
       wx.cloud.callContainer({
         config: app.globalData.cloudEnv ? { env: app.globalData.cloudEnv } : undefined,
