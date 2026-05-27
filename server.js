@@ -144,8 +144,49 @@ const styles = styleGroups.flatMap((group, groupIndex) => group.styles.map((styl
 
 const recommendationCatalog = [
   {
+    id: 'male-american-textured-fringe',
+    label: '美式前刺',
+    gender: 'male',
+    shapes: ['oval', 'round', 'square', 'oblong'],
+    volume: ['medium', 'thick'],
+    texture: ['straight', 'coarse', 'soft'],
+    vibe: '清爽潮流',
+    reason: '前刺提升颅顶和精神感，侧区更利落。'
+  },
+  {
+    id: 'male-soft-wolf-cut',
+    label: '软狼尾',
+    gender: 'male',
+    shapes: ['oval', 'oblong', 'diamond', 'heart'],
+    volume: ['medium', 'thick'],
+    texture: ['straight', 'wavy', 'soft'],
+    vibe: '松弛时髦',
+    reason: '层次能修饰头脸比例，保留自然少年感。'
+  },
+  {
+    id: 'female-wispy-bangs',
+    label: 'wispy bangs',
+    gender: 'female',
+    shapes: ['oval', 'oblong', 'heart', 'diamond'],
+    volume: ['thin', 'medium', 'thick'],
+    texture: ['soft', 'straight', 'wavy'],
+    vibe: '轻盈减龄',
+    reason: '轻薄碎刘海柔化额头和脸部比例。'
+  },
+  {
+    id: 'female-hot-girl-bob',
+    label: '辣妹波波头',
+    gender: 'female',
+    shapes: ['oval', 'heart', 'diamond', 'square'],
+    volume: ['medium', 'thick'],
+    texture: ['straight', 'soft', 'wavy'],
+    vibe: '利落上镜',
+    reason: '贴合脸侧的波波轮廓更有时髦感。'
+  },
+  {
     id: 'real-layered-brown',
     label: '真人层次卷',
+    gender: 'female',
     shapes: ['oval', 'oblong', 'square'],
     volume: ['thin', 'medium'],
     texture: ['soft', 'wavy'],
@@ -155,6 +196,7 @@ const recommendationCatalog = [
   {
     id: 'real-black-long',
     label: '真人黑长卷',
+    gender: 'female',
     shapes: ['heart', 'oval', 'round'],
     volume: ['medium', 'thick'],
     texture: ['soft', 'wavy'],
@@ -164,6 +206,7 @@ const recommendationCatalog = [
   {
     id: 'best-french-layered',
     label: '法式层次',
+    gender: 'female',
     shapes: ['oval', 'heart', 'square'],
     volume: ['medium', 'thick'],
     texture: ['soft', 'straight'],
@@ -173,6 +216,7 @@ const recommendationCatalog = [
   {
     id: 'best-side-waves',
     label: '侧分微卷',
+    gender: 'female',
     shapes: ['round', 'square', 'oval'],
     volume: ['thin', 'medium'],
     texture: ['wavy', 'soft'],
@@ -182,6 +226,7 @@ const recommendationCatalog = [
   {
     id: 'best-textured-mid',
     label: '纹理中短',
+    gender: 'androgynous',
     shapes: ['oblong', 'oval', 'heart'],
     volume: ['medium', 'thick'],
     texture: ['straight', 'soft'],
@@ -191,6 +236,7 @@ const recommendationCatalog = [
   {
     id: 'best-collarbone-lob',
     label: '锁骨内扣',
+    gender: 'female',
     shapes: ['round', 'square', 'heart'],
     volume: ['thin', 'medium'],
     texture: ['straight', 'soft'],
@@ -200,6 +246,7 @@ const recommendationCatalog = [
   {
     id: 'best-air-bangs-long',
     label: '空气刘海',
+    gender: 'female',
     shapes: ['oblong', 'heart', 'oval'],
     volume: ['medium', 'thick'],
     texture: ['soft', 'straight'],
@@ -209,6 +256,7 @@ const recommendationCatalog = [
   {
     id: 'ok-curtain-bangs',
     label: '八字刘海',
+    gender: 'female',
     shapes: ['round', 'square', 'heart'],
     volume: ['thin', 'medium'],
     texture: ['soft', 'wavy'],
@@ -218,6 +266,7 @@ const recommendationCatalog = [
   {
     id: 'ok-shoulder-flip',
     label: '齐肩外翻',
+    gender: 'female',
     shapes: ['oval', 'oblong', 'square'],
     volume: ['medium'],
     texture: ['straight', 'soft'],
@@ -227,6 +276,7 @@ const recommendationCatalog = [
   {
     id: 'ok-low-layer-long',
     label: '低层次长发',
+    gender: 'female',
     shapes: ['heart', 'oval', 'square'],
     volume: ['thick', 'medium'],
     texture: ['straight', 'wavy'],
@@ -236,6 +286,7 @@ const recommendationCatalog = [
   {
     id: 'ok-wet-back',
     label: '湿发后梳',
+    gender: 'androgynous',
     shapes: ['oval', 'oblong'],
     volume: ['medium', 'thick'],
     texture: ['straight', 'soft'],
@@ -245,6 +296,10 @@ const recommendationCatalog = [
 ];
 
 const recommendationPrompts = {
+  'male-american-textured-fringe': 'American textured fringe for men, short-to-medium top pushed forward into piecey spiky forward texture, lifted roots, matte finish, low taper or subtle drop fade sides, clean temples, natural dark hair, realistic masculine hairline, NOT slicked back, NOT bowl cut',
+  'male-soft-wolf-cut': 'male soft wolf cut, layered shag-wolf silhouette, airy crown volume, textured side layers, slightly longer nape, face-framing fringe, wearable salon finish, natural dark hair, realistic masculine hairline, NOT messy cosplay hair',
+  'female-wispy-bangs': 'wispy bangs for women, transparent feathered see-through fringe, soft forehead coverage, airy face-framing layers, natural root volume, glossy realistic strands, feminine light salon finish',
+  'female-hot-girl-bob': 'hot-girl bob for women, glossy jaw-to-collarbone bob, slightly tousled texture, face-hugging curve, optional side part, chic confident girl-crush mood, realistic hairline, not helmet-like',
   'real-layered-brown': 'soft layered medium-long salon waves, warm brunette tone, face-framing layers around cheekbones and jaw, airy crown volume, natural realistic hairline and temples',
   'real-black-long': 'long black soft waves with natural density, gentle face-framing curtain shape, glossy healthy texture, realistic roots and hairline, elegant feminine silhouette',
   'best-french-layered': 'airy French layered haircut, soft volume around crown, natural broken texture, refined face-framing layers, clean salon finish',
@@ -626,6 +681,86 @@ function stripJsonFence(text) {
   return String(text || '').trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
 }
 
+function recommendationGenderBucket(value = '') {
+  const text = String(value || '').toLowerCase();
+  if (/male|masculine|男/.test(text) && !/female|女/.test(text)) return 'male';
+  if (/female|feminine|女/.test(text)) return 'female';
+  if (/androgynous|中性/.test(text)) return 'androgynous';
+  return 'uncertain';
+}
+
+function recommendationText(style) {
+  return `${style.id || ''} ${style.label || ''} ${style.prompt || ''}`.toLowerCase();
+}
+
+function styleGenderBucket(style) {
+  const text = recommendationText(style);
+  if (/美式前刺|前刺|american textured fringe|french crop|法式前刺|逗号|comma|male soft wolf|男/.test(text)) return 'male';
+  if (/wispy|辣妹|波波|bob|长卷|层次卷|锁骨|空气刘海|八字刘海|齐肩|long waves|lob|female|女/.test(text)) return 'female';
+  return recommendationGenderBucket(style.genderPresentation || style.gender || '');
+}
+
+function isGenderCompatible(style, bucket) {
+  const styleBucket = styleGenderBucket(style);
+  if (bucket === 'male') return styleBucket !== 'female';
+  if (bucket === 'female') return styleBucket !== 'male';
+  return true;
+}
+
+function catalogRecommendation(id, rank = 1) {
+  const item = recommendationById(id);
+  return {
+    ...item,
+    rank,
+    prompt: recommendationPrompts[id] || item?.label || '',
+    genderPresentation: item?.gender || 'androgynous'
+  };
+}
+
+function enforceTrendRecommendationRules(items, analysis, fallback, count = 5) {
+  const bucket = recommendationGenderBucket(analysis.genderPresentation);
+  const forcedIds = bucket === 'male'
+    ? ['male-american-textured-fringe', 'male-soft-wolf-cut']
+    : bucket === 'female'
+      ? ['female-wispy-bangs', 'female-hot-girl-bob']
+      : ['male-american-textured-fringe', 'female-wispy-bangs'];
+  const fallbackPool = [
+    ...forcedIds,
+    ...fallback.recommendations.map((item) => item.id),
+    ...recommendationCatalog
+      .filter((item) => isGenderCompatible(item, bucket))
+      .map((item) => item.id)
+  ];
+  const result = [];
+
+  for (const id of forcedIds) {
+    const existing = items.find((item) => item.id === id || item.label === recommendationById(id)?.label);
+    const style = existing || catalogRecommendation(id);
+    if (style && isGenderCompatible(style, bucket)) result.push(style);
+    if (bucket !== 'male' && bucket !== 'female' && result.length >= 1) break;
+  }
+
+  for (const item of items) {
+    if (result.length >= count) break;
+    if (!isGenderCompatible(item, bucket)) continue;
+    if (result.some((candidate) => candidate.id === item.id || candidate.label === item.label)) continue;
+    result.push(item);
+  }
+
+  for (const id of fallbackPool) {
+    if (result.length >= count) break;
+    if (result.some((candidate) => candidate.id === id || candidate.label === recommendationById(id)?.label)) continue;
+    const item = catalogRecommendation(id);
+    if (item && isGenderCompatible(item, bucket)) result.push(item);
+  }
+
+  return result.slice(0, count).map((item, index) => ({
+    ...item,
+    rank: index + 1,
+    genderPresentation: item.genderPresentation || bucket
+  }));
+}
+
 function normalizeRecommendation(payload, fallback, count = 5) {
   const picked = [];
   for (const item of payload.recommendations || []) {
@@ -650,21 +785,23 @@ function normalizeRecommendation(payload, fallback, count = 5) {
       picked.push({
         ...item,
         rank: picked.length + 1,
-        prompt: recommendationPrompts[item.id] || item.label
+        prompt: recommendationPrompts[item.id] || item.prompt || item.label
       });
     }
   }
+  const analysis = {
+    faceShape: payload.analysis?.faceShape || fallback.analysis.faceShape,
+    hair: payload.analysis?.hair || fallback.analysis.hair,
+    genderPresentation: shortText(payload.analysis?.genderPresentation, 16, fallback.analysis.genderPresentation || 'uncertain'),
+    genderLabel: shortText(payload.analysis?.genderLabel, 16, fallback.analysis.genderLabel || '未确定'),
+    style: shortText(payload.analysis?.style, 16, fallback.analysis.style || '自然'),
+    summary: shortText(payload.analysis?.summary, 90, fallback.analysis.summary || '')
+  };
+  const recommendations = enforceTrendRecommendationRules(picked, analysis, fallback, count);
   return {
     provider: payload.provider || analysisProvider,
-    analysis: {
-      faceShape: payload.analysis?.faceShape || fallback.analysis.faceShape,
-      hair: payload.analysis?.hair || fallback.analysis.hair,
-      genderPresentation: shortText(payload.analysis?.genderPresentation, 16, 'uncertain'),
-      genderLabel: shortText(payload.analysis?.genderLabel, 16, '未确定'),
-      style: shortText(payload.analysis?.style, 16, fallback.analysis.style || '自然'),
-      summary: shortText(payload.analysis?.summary, 90, fallback.analysis.summary || '')
-    },
-    recommendations: picked.slice(0, count)
+    analysis,
+    recommendations
   };
 }
 

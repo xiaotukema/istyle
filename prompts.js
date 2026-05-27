@@ -51,10 +51,11 @@ export function buildRecommendationPrompt(metrics, count = 5, now = new Date()) 
 - 推荐要兼顾中国审美和海外流行趋势，允许出现「美式前刺」「法式前刺」「韩式逗号刘海」「蝴蝶层次」「法式波波」「软狼尾」等热门方向，但只有适合本人时才推荐。
 - 如果推荐这些命名发型，prompt 必须保留趋势参考池里的关键结构词，尤其美式前刺必须是 forward textured fringe + low taper/drop fade + lifted roots + matte piecey texture，不能生成成普通短碎发、背头或蘑菇头。
 - 固定热门款权重规则，必须执行：
-  - 如果 genderPresentation 判断为 male，recommendations 里必须至少包含「美式前刺」或「软狼尾」其中 1 款；如果两者都适合，优先包含「美式前刺」。
-  - 如果 genderPresentation 判断为 female，recommendations 里必须至少包含「wispy bangs / 轻盈空气感碎刘海」或「辣妹波波头」其中 1 款；如果两者都适合，优先包含「wispy bangs」。
+  - 如果 genderPresentation 判断为 male，recommendations 里必须包含「美式前刺」或「软狼尾」其中 1–2 款；如果两者都适合，优先同时包含这两款；严禁推荐长卷、波波头、锁骨发、空气刘海、八字刘海等女性化长发/中长发。
+  - 如果 genderPresentation 判断为 female，recommendations 里必须包含「wispy bangs / 轻盈空气感碎刘海」或「辣妹波波头」其中 1–2 款；如果两者都适合，优先同时包含这两款；严禁推荐美式前刺、法式前刺等男性短寸/前刺发型。
   - 如果 genderPresentation 是 androgynous 或 uncertain，则必须至少包含上述四类热门款中的 1 款，但选择更中性、更适配脸型的一款。
   - 这些固定热门款也必须遵守本人脸型、发量、发际线和风格适配，不得换脸或改变性别呈现。
+- 你必须真实分析输入截图，不允许复用模板答案；如果用户是男性呈现，推荐结果整体必须偏男性或中性；如果用户是女性呈现，推荐结果整体必须偏女性或中性。
 - 不要为了追热点牺牲适配度；最重要的是头脸比例、发际线、发量和日常可实现性。
 - 每次必须先描述你从截图中观察到的个人化差异，避免输出模板化结论；summary 必须包含至少一个具体观察点，例如额头高度、脸宽/脸长、下颌线、颧骨、当前发量、当前发际线或整体气质。
 
