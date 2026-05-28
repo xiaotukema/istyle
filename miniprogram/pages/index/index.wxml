@@ -11,7 +11,7 @@
   <view class="snap-flash {{snapFlash ? 'show' : ''}}"></view>
 
   <view class="panel {{currentImage ? 'panel-compact' : ''}}">
-    <view class="title">实时发型试戴</view>
+    <view class="title" bindtap="onGestureFallbackTap">实时发型试戴</view>
     <view class="quota">今日剩余 {{quota.remaining}} / {{quota.limit}}</view>
     <view class="analysis" wx:if="{{analysis.summary}}">
       <view>{{analysis.summary}}</view>

@@ -10,6 +10,7 @@ const SNAP_COOLDOWN = 950;
 const PINCH_CLOSE_RATIO = 0.46;
 const PINCH_OPEN_RATIO = 0.7;
 const PINCH_SPEED_RATIO = 0.08;
+const VK_VERSIONS = ['v2', 'v1'];
 
 function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -56,7 +57,8 @@ Page({
     loadingText: '',
     remainingCount: TOTAL_COUNT,
     snapFlash: false,
-    gestureHint: ''
+    gestureHint: '',
+    gestureFallbackTapEnabled: false
   },
 
   onLoad() {},
@@ -92,15 +94,36 @@ Page({
     let session;
     let camera;
     let listener;
-    try {
-      session = wx.createVKSession({
-        track: {
-          hand: { mode: 2 }
-        }
+    const versions = this.getSupportedVKVersions();
+    if (!versions.length) {
+      const isDevtools = this.isDevtoolsRuntime();
+      this.setData({
+        gestureHint: isDevtools
+          ? '开发者工具不支持手势识别，真机预览可测；点标题可模拟响指。'
+          : '当前设备不支持手势识别，可使用按钮操作。',
+        gestureFallbackTapEnabled: isDevtools
       });
-      camera = wx.createCameraContext();
-      listener = camera.onCameraFrame((frame) => this.onHandCameraFrame(frame));
-    } catch (err) {
+      return;
+    }
+
+    for (let index = 0; index < versions.length; index += 1) {
+      try {
+        session = wx.createVKSession({
+          version: versions[index],
+          track: {
+            hand: { mode: 2 }
+          }
+        });
+        camera = wx.createCameraContext();
+        listener = camera.onCameraFrame((frame) => this.onHandCameraFrame(frame));
+        break;
+      } catch (err) {
+        session = null;
+        listener = null;
+      }
+    }
+
+    if (!session || !listener) {
       this.setData({ gestureHint: '手势识别初始化失败，可使用按钮操作。' });
       return;
     }
@@ -114,11 +137,14 @@ Page({
     this.handFrameListener = listener;
     this.handGestureStarted = true;
     this.handSessionReady = false;
+    this.handSessionStarted = false;
+    this.handleVKUpdateAnchors = (res) => this.handleHandAnchors(res);
+    this.handleVKRemoveAnchors = () => this.resetSnapState();
     this.resetSnapState();
 
     if (session && typeof session.on === 'function') {
-      session.on('updateAnchors', (res) => this.handleHandAnchors(res));
-      session.on('removeAnchors', () => this.resetSnapState());
+      session.on('updateAnchors', this.handleVKUpdateAnchors);
+      session.on('removeAnchors', this.handleVKRemoveAnchors);
     }
 
     const startFrameListener = () => {
@@ -126,7 +152,10 @@ Page({
       this.handSessionReady = true;
       try {
         listener.start();
-        this.setData({ gestureHint: '捏一下或打响指即可开始推荐 / 切换发型。' });
+        this.setData({
+          gestureHint: '捏一下或打响指即可开始推荐 / 切换发型。',
+          gestureFallbackTapEnabled: false
+        });
       } catch (err) {
         this.stopHandGesture();
         this.setData({ gestureHint: '手势识别启动失败，可使用按钮操作。' });
@@ -142,10 +171,11 @@ Page({
             this.handSessionReadyTimer = 0;
           }
           if (errno) {
-            this.stopHandGesture();
+            this.stopHandGesture({ skipSessionStop: true });
             this.setData({ gestureHint: '手势识别启动失败，可使用按钮操作。' });
             return;
           }
+          this.handSessionStarted = true;
           startFrameListener();
         });
       } else {
@@ -157,13 +187,46 @@ Page({
     }
   },
 
-  stopHandGesture() {
+  getSupportedVKVersions() {
+    if (this.isDevtoolsRuntime()) return [];
+    if (typeof wx.isVKSupport !== 'function') return ['v1'];
+    const versions = [];
+    for (let index = 0; index < VK_VERSIONS.length; index += 1) {
+      const version = VK_VERSIONS[index];
+      try {
+        if (wx.isVKSupport(version)) versions.push(version);
+      } catch (err) {}
+    }
+    return versions;
+  },
+
+  isDevtoolsRuntime() {
+    try {
+      const deviceInfo = typeof wx.getDeviceInfo === 'function' ? wx.getDeviceInfo() : wx.getSystemInfoSync();
+      return !!deviceInfo && deviceInfo.platform === 'devtools';
+    } catch (err) {
+      return false;
+    }
+  },
+
+  onGestureFallbackTap() {
+    if (!this.data.gestureFallbackTapEnabled) return;
+    this.triggerSnapAction();
+  },
+
+  stopHandGesture(options = {}) {
     if (this.handFrameListener && typeof this.handFrameListener.stop === 'function') {
       try {
         this.handFrameListener.stop();
       } catch (err) {}
     }
-    if (this.handSession && typeof this.handSession.stop === 'function') {
+    if (this.handSession && typeof this.handSession.off === 'function') {
+      try {
+        if (this.handleVKUpdateAnchors) this.handSession.off('updateAnchors', this.handleVKUpdateAnchors);
+        if (this.handleVKRemoveAnchors) this.handSession.off('removeAnchors', this.handleVKRemoveAnchors);
+      } catch (err) {}
+    }
+    if (!options.skipSessionStop && this.handSessionStarted && this.handSession && typeof this.handSession.stop === 'function') {
       try {
         this.handSession.stop();
       } catch (err) {}
@@ -176,7 +239,10 @@ Page({
     this.handSession = null;
     this.handGestureStarted = false;
     this.handSessionReady = false;
+    this.handSessionStarted = false;
     this.handDetecting = false;
+    this.handleVKUpdateAnchors = null;
+    this.handleVKRemoveAnchors = null;
     this.resetSnapState();
   },
 
