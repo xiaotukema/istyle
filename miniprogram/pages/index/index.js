@@ -1,4 +1,4 @@
-const { request, uploadCapture } = require('../../utils/api');
+const { request, login, uploadCapture } = require('../../utils/api');
 
 const INITIAL_COUNT = 5;
 const MORE_COUNT = 3;
@@ -61,7 +61,24 @@ Page({
     gestureFallbackTapEnabled: false
   },
 
-  onLoad() {},
+  onLoad() {
+    this.ensureLogin();
+  },
+
+  async ensureLogin() {
+    if (this.loginPromise) return this.loginPromise;
+    this.loginPromise = login()
+      .then((data) => {
+        if (data.quota) this.setData({ quota: data.quota });
+        return data;
+      })
+      .catch((err) => {
+        this.loginPromise = null;
+        wx.showToast({ title: err.message || '登录失败，请稍后重试', icon: 'none' });
+        throw err;
+      });
+    return this.loginPromise;
+  },
 
   onShow() {
     if (this.cameraReady) this.initHandGesture();
@@ -407,6 +424,7 @@ Page({
   async startRecommend() {
     if (this.data.loading) return;
     try {
+      await this.ensureLogin();
       this.setData({ loading: true, loadingText: '正在分析并生成 5 款发型' });
       const image = await this.captureFrame();
       const rec = await request('/api/hair-recommendation', {
@@ -422,6 +440,9 @@ Page({
         analysis: rec.analysis || {},
         remainingCount: TOTAL_COUNT - first.length
       });
+      if (rec.provider && /fallback/i.test(rec.provider)) {
+        wx.showToast({ title: rec.warning || 'AI 分析失败，已使用备用推荐', icon: 'none' });
+      }
       await this.generateTryOns(first);
     } catch (err) {
       wx.showToast({ title: err.message || '推荐失败', icon: 'none' });
@@ -431,6 +452,7 @@ Page({
   },
 
   async generateTryOns(styles) {
+    await this.ensureLogin();
     const pendingStyles = (styles || []).filter((style) => style && !style.tryonImage);
     const errors = [];
 

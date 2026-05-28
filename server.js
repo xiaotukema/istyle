@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import crypto from 'node:crypto';
+import mysql from 'mysql2/promise';
 import { buildAestheticPrompt, buildAestheticTryOnPrompt, buildRecommendationPrompt, buildTryOnPrompt } from './prompts.js';
 
 const root = fileURLToPath(new URL('.', import.meta.url));
@@ -71,6 +72,7 @@ const dailyHairLimit = Number(process.env.DAILY_HAIR_LIMIT || 11);
 const enableDevQuotaReset = process.env.ENABLE_DEV_QUOTA_RESET === 'true';
 const authSessions = new Map();
 const quotaByUserDay = new Map();
+let quotaPoolPromise = null;
 const hairTryOnJobs = new Map();
 const hairTryOnHistory = [];
 const hairTryOnJobTtlMs = 45 * 60 * 1000;
@@ -525,26 +527,143 @@ function sessionUser(req) {
   return token ? authSessions.get(token) : null;
 }
 
-function quotaState(userId) {
+function requireUser(req) {
+  const user = sessionUser(req);
+  if (!user) {
+    const err = new Error('未登录');
+    err.status = 401;
+    throw err;
+  }
+  return user;
+}
+
+function parseMysqlAddress(address = '') {
+  const [host = '', port = '3306'] = String(address).split(':');
+  return { host, port: Number(port || 3306) };
+}
+
+function mysqlIdentifier(value, fallback = 'istyle') {
+  return String(value || fallback).replace(/`/g, '').trim() || fallback;
+}
+
+async function quotaPool() {
+  if (!process.env.MYSQL_ADDRESS || !process.env.MYSQL_USERNAME || !process.env.MYSQL_PASSWORD) return null;
+  if (quotaPoolPromise) return quotaPoolPromise;
+  quotaPoolPromise = (async () => {
+    const { host, port: mysqlPort } = parseMysqlAddress(process.env.MYSQL_ADDRESS);
+    const database = mysqlIdentifier(process.env.MYSQL_DATABASE || process.env.MYSQL_DB);
+    const baseConfig = {
+      host,
+      port: mysqlPort,
+      user: process.env.MYSQL_USERNAME,
+      password: process.env.MYSQL_PASSWORD,
+      charset: 'utf8mb4'
+    };
+    const connection = await mysql.createConnection(baseConfig);
+    try {
+      await connection.query(`CREATE DATABASE IF NOT EXISTS \`${database}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
+    } finally {
+      await connection.end();
+    }
+
+    const pool = mysql.createPool({
+      ...baseConfig,
+      database,
+      waitForConnections: true,
+      connectionLimit: Number(process.env.MYSQL_CONNECTION_LIMIT || 4),
+      maxIdle: Number(process.env.MYSQL_CONNECTION_LIMIT || 4),
+      idleTimeout: 60000
+    });
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS daily_generation_usage (
+        openid VARCHAR(128) NOT NULL,
+        usage_date CHAR(10) NOT NULL,
+        used_count INT NOT NULL DEFAULT 0,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (openid, usage_date)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    `);
+    console.log(`Quota store: mysql://${host}:${mysqlPort}/${database}`);
+    return pool;
+  })().catch((err) => {
+    console.error(`[quota] MySQL 初始化失败，临时回退到内存控频：${err.stack || err.message || String(err)}`);
+    quotaPoolPromise = Promise.resolve(null);
+    return null;
+  });
+  return quotaPoolPromise;
+}
+
+async function quotaState(userId) {
   const key = `${userId}:${todayKey()}`;
+  const pool = await quotaPool();
+  if (pool) {
+    const [rows] = await pool.execute(
+      'SELECT used_count FROM daily_generation_usage WHERE openid = ? AND usage_date = ? LIMIT 1',
+      [userId, todayKey()]
+    );
+    const used = rows[0]?.used_count || 0;
+    return { key, used, remaining: Math.max(0, dailyHairLimit - used), limit: dailyHairLimit };
+  }
   const used = quotaByUserDay.get(key) || 0;
   return { key, used, remaining: Math.max(0, dailyHairLimit - used), limit: dailyHairLimit };
 }
 
-function consumeQuota(userId, amount) {
-  const state = quotaState(userId);
-  if (state.used + amount > dailyHairLimit) {
-    const err = new Error('您的今日生成次数已达上限，请明天再来试试吧');
-    err.status = 429;
-    err.quota = state;
-    throw err;
+function quotaLimitError(state) {
+  const err = new Error('您的今日生成次数已达上限，请明天再来试试吧');
+  err.status = 429;
+  err.quota = state;
+  return err;
+}
+
+async function consumeQuota(userId, amount) {
+  const date = todayKey();
+  const key = `${userId}:${date}`;
+  const pool = await quotaPool();
+  if (pool) {
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      const [rows] = await connection.execute(
+        'SELECT used_count FROM daily_generation_usage WHERE openid = ? AND usage_date = ? FOR UPDATE',
+        [userId, date]
+      );
+      const used = rows[0]?.used_count || 0;
+      const state = { key, used, remaining: Math.max(0, dailyHairLimit - used), limit: dailyHairLimit };
+      if (used + amount > dailyHairLimit) throw quotaLimitError(state);
+      if (rows.length) {
+        await connection.execute(
+          'UPDATE daily_generation_usage SET used_count = ? WHERE openid = ? AND usage_date = ?',
+          [used + amount, userId, date]
+        );
+      } else {
+        await connection.execute(
+          'INSERT INTO daily_generation_usage (openid, usage_date, used_count) VALUES (?, ?, ?)',
+          [userId, date, amount]
+        );
+      }
+      await connection.commit();
+      return { key, used: used + amount, remaining: Math.max(0, dailyHairLimit - used - amount), limit: dailyHairLimit };
+    } catch (err) {
+      await connection.rollback().catch(() => {});
+      throw err;
+    } finally {
+      connection.release();
+    }
   }
+  const state = await quotaState(userId);
+  if (state.used + amount > dailyHairLimit) throw quotaLimitError(state);
   quotaByUserDay.set(state.key, state.used + amount);
   return quotaState(userId);
 }
 
-function resetQuota(userId) {
-  quotaByUserDay.delete(`${userId}:${todayKey()}`);
+async function resetQuota(userId) {
+  const date = todayKey();
+  const pool = await quotaPool();
+  if (pool) {
+    await pool.execute('DELETE FROM daily_generation_usage WHERE openid = ? AND usage_date = ?', [userId, date]);
+  }
+  quotaByUserDay.delete(`${userId}:${date}`);
   return quotaState(userId);
 }
 
@@ -634,7 +753,7 @@ async function createWechatSession(code) {
   const token = crypto.randomUUID();
   const user = { openid, createdAt: Date.now() };
   authSessions.set(token, user);
-  return { token, user, quota: quotaState(openid) };
+  return { token, user, quota: await quotaState(openid) };
 }
 
 function portraitPrompt(style) {
@@ -756,6 +875,37 @@ function aestheticPrompt(metrics) {
 
 function stripJsonFence(text) {
   return String(text || '').trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+}
+
+function extractResponseText(payload) {
+  if (!payload) return '';
+  if (typeof payload.output_text === 'string') return payload.output_text;
+  if (typeof payload.text === 'string') return payload.text;
+  if (typeof payload.content === 'string') return payload.content;
+  if (payload.choices?.[0]?.message?.content) return payload.choices[0].message.content;
+
+  const texts = [];
+  const visit = (value) => {
+    if (!value) return;
+    if (typeof value === 'string') return;
+    if (Array.isArray(value)) {
+      value.forEach(visit);
+      return;
+    }
+    if (typeof value !== 'object') return;
+    if ((value.type === 'output_text' || value.type === 'text') && typeof value.text === 'string') {
+      texts.push(value.text);
+      return;
+    }
+    if (typeof value.text === 'string' && Object.keys(value).length <= 3) {
+      texts.push(value.text);
+      return;
+    }
+    visit(value.content);
+    visit(value.output);
+  };
+  visit(payload.output);
+  return texts.join('\n').trim();
 }
 
 function recommendationGenderBucket(value = '') {
@@ -934,33 +1084,29 @@ async function createGeminiRecommendation(imageDataUrl, metrics, count = 5) {
 async function createArkRecommendation(imageDataUrl, metrics, count = 5) {
   if (!process.env.ARK_API_KEY) throw new Error('缺少 ARK_API_KEY。');
   const imageUrl = dataUrlToArkImageUrl(imageDataUrl);
+  const requestPayload = {
+    model: analysisModel,
+    input: [{
+      role: 'user',
+      content: [
+        { type: 'input_image', image_url: imageUrl },
+        { type: 'input_text', text: `${recommendationPrompt(metrics, count)}\n\n请只输出 JSON，不要输出 Markdown。` }
+      ]
+    }]
+  };
   const response = await fetch(`${arkApiBase}/responses`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${process.env.ARK_API_KEY}`
     },
-    body: JSON.stringify({
-      model: analysisModel,
-      input: [{
-        role: 'user',
-        content: [
-          { type: 'input_image', image_url: imageUrl },
-          { type: 'input_text', text: `${recommendationPrompt(metrics, count)}\n\n请只输出 JSON，不要输出 Markdown。` }
-        ]
-      }],
-      response_format: { type: 'json_object' },
-      temperature: 0.35
-    })
+    body: JSON.stringify(requestPayload)
   });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(payload.error?.message || payload.message || `火山方舟推荐失败：HTTP ${response.status}`);
+    throw new Error(payload.error?.message || payload.message || payload.msg || `火山方舟推荐失败：HTTP ${response.status}`);
   }
-  const text = payload.output_text
-    || payload.output?.flatMap((item) => item.content || []).map((part) => part.text).filter(Boolean).join('\n')
-    || payload.choices?.[0]?.message?.content
-    || '';
+  const text = extractResponseText(payload);
   if (!text) throw new Error('火山方舟推荐没有返回文本。');
   return JSON.parse(stripJsonFence(text));
 }
@@ -1811,9 +1957,12 @@ const server = createServer(async (req, res) => {
     if (req.method === 'POST' && requestUrl.pathname === '/api/hair-recommendation') {
       const body = await readBody(req);
       const payload = JSON.parse(body || '{}');
-      console.log(`[hair-recommendation] provider=${analysisProvider} count=${payload.count || 5}`);
+      const user = requireUser(req);
+      console.log(`[hair-recommendation] provider=${analysisProvider} count=${payload.count || 5} user=${user.source}`);
       const inputImage = payload.image || payload.imageUrl;
-      const image = await imageInputToDataUrl(inputImage);
+      const image = analysisProvider === 'ark' && /^https?:\/\//i.test(String(inputImage || ''))
+        ? inputImage
+        : await imageInputToDataUrl(inputImage);
       const result = await createHairRecommendation(image, payload.metrics || {}, { count: payload.count });
       json(res, 200, result);
       return;
@@ -1838,17 +1987,17 @@ const server = createServer(async (req, res) => {
     if (req.method === 'POST' && requestUrl.pathname === '/api/hair-tryon') {
       const body = await readBody(req);
       const payload = JSON.parse(body || '{}');
-      const user = sessionUser(req);
+      const user = requireUser(req);
       const requested = Math.max(1, Math.min(15, Number(payload.limit || (payload.recommendations || []).length || tryOnLimit)));
       const labels = (payload.recommendations || []).map((style) => style.label).filter(Boolean).join('、');
       console.log(`[hair-tryon] provider=${imageProvider} requested=${requested} styles=${labels || '-'}`);
-      if (user) consumeQuota(user.openid, requested);
+      await consumeQuota(user.openid, requested);
       const inputImage = payload.image || payload.imageUrl;
       const image = (imageProvider === 'seedream' || imageProvider === 'ark') && /^https?:\/\//i.test(String(inputImage || ''))
         ? inputImage
         : await imageInputToDataUrl(inputImage);
       const result = await createRecommendedTryOns(image, payload.recommendations || [], { limit: payload.limit });
-      if (user) result.quota = quotaState(user.openid);
+      result.quota = await quotaState(user.openid);
       recordHairTryOnResult({ owner: user?.openid || '', mode: 'sync', result });
       json(res, 200, result);
       return;
@@ -1858,24 +2007,24 @@ const server = createServer(async (req, res) => {
       pruneHairTryOnJobs();
       const body = await readBody(req);
       const payload = JSON.parse(body || '{}');
-      const user = sessionUser(req);
+      const user = requireUser(req);
       const requested = Math.max(1, Math.min(15, Number(payload.limit || (payload.recommendations || []).length || tryOnLimit)));
       const labels = (payload.recommendations || []).map((style) => style.label).filter(Boolean).join('、');
       console.log(`[hair-tryon-job] provider=${imageProvider} requested=${requested} styles=${labels || '-'}`);
-      if (user) consumeQuota(user.openid, requested);
+      const quota = await consumeQuota(user.openid, requested);
       const inputImage = payload.image || payload.imageUrl;
       const image = (imageProvider === 'seedream' || imageProvider === 'ark') && /^https?:\/\//i.test(String(inputImage || ''))
         ? inputImage
         : await imageInputToDataUrl(inputImage);
       const jobId = crypto.randomUUID();
-      const owner = user?.openid || '';
+      const owner = user.openid;
       const job = {
         id: jobId,
         owner,
         status: 'running',
         result: null,
         error: '',
-        quota: user ? quotaState(user.openid) : null,
+        quota,
         createdAt: Date.now(),
         updatedAt: Date.now()
       };
@@ -1885,7 +2034,7 @@ const server = createServer(async (req, res) => {
       Promise.resolve().then(async () => {
         console.log(`[hair-tryon-job:${jobId.slice(0, 8)}] start`);
         const result = await createRecommendedTryOns(image, payload.recommendations || [], { limit: payload.limit });
-        if (user) result.quota = quotaState(user.openid);
+        result.quota = await quotaState(user.openid);
         job.status = 'done';
         job.result = result;
         job.quota = result.quota || job.quota;
@@ -1895,7 +2044,9 @@ const server = createServer(async (req, res) => {
       }).catch((err) => {
         job.status = 'failed';
         job.error = err.message || String(err);
-        job.quota = user ? quotaState(user.openid) : job.quota;
+        Promise.resolve(quotaState(user.openid)).then((state) => {
+          job.quota = state;
+        }).catch(() => {});
         job.updatedAt = Date.now();
         console.error(`[hair-tryon-job:${jobId.slice(0, 8)}] failed: ${err.stack || err.message || String(err)}`);
       });
@@ -1906,7 +2057,7 @@ const server = createServer(async (req, res) => {
       pruneHairTryOnJobs();
       const jobId = requestUrl.searchParams.get('id') || '';
       const job = hairTryOnJobs.get(jobId);
-      const user = sessionUser(req);
+      const user = requireUser(req);
       if (!job) {
         json(res, 404, { error: '生成任务不存在或已过期' });
         return;
@@ -1942,12 +2093,8 @@ const server = createServer(async (req, res) => {
     }
 
     if (req.method === 'GET' && requestUrl.pathname === '/api/quota') {
-      const user = sessionUser(req);
-      if (!user) {
-        json(res, 401, { error: '未登录' });
-        return;
-      }
-      json(res, 200, { quota: quotaState(user.openid) });
+      const user = requireUser(req);
+      json(res, 200, { quota: await quotaState(user.openid) });
       return;
     }
 
@@ -1956,12 +2103,8 @@ const server = createServer(async (req, res) => {
         json(res, 404, { error: 'Not found' });
         return;
       }
-      const user = sessionUser(req);
-      if (!user) {
-        json(res, 401, { error: '未登录' });
-        return;
-      }
-      json(res, 200, { quota: resetQuota(user.openid) });
+      const user = requireUser(req);
+      json(res, 200, { quota: await resetQuota(user.openid) });
       return;
     }
 

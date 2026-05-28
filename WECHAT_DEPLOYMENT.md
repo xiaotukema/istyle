@@ -20,6 +20,7 @@ ANALYSIS_MODEL=doubao-seed-2-0-pro-260215
 DAILY_HAIR_LIMIT=11
 HAIR_VARIANT_CONCURRENCY=1
 ENABLE_DEV_QUOTA_RESET=false
+MYSQL_DATABASE=istyle
 ```
 
 When running through CloudBase Run, the backend reads the WeChat openid from
@@ -27,13 +28,11 @@ the cloud container request header. `WX_APPID` and `WX_APP_SECRET` are only
 needed for the local HTTPS backend fallback that uses `wx.login` and
 `/api/auth/wechat-login`.
 
-Before real launch, replace the current in-memory quota storage with persistent
-storage.
+The server uses CloudBase MySQL automatically when `MYSQL_ADDRESS`,
+`MYSQL_USERNAME`, and `MYSQL_PASSWORD` are present. It creates the quota database
+and table if needed. Recommended table shape:
 
-Recommended tables/keys:
-
-- `users`: `openid`, `created_at`
-- `daily_generation_usage`: `openid`, `date`, `used_count`
+- `daily_generation_usage`: `openid`, `usage_date`, `used_count`
 
 ## 2. Mini Program
 
