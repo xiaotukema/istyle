@@ -68,7 +68,7 @@ function request(path, options = {}) {
           }
         },
         fail(err) {
-          reject(toError(err, '云托管请求失败'));
+          reject(toError(err, `云托管请求失败：${path}`));
         }
       });
     });

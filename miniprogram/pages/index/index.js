@@ -58,7 +58,8 @@ Page({
     remainingCount: TOTAL_COUNT,
     snapFlash: false,
     gestureHint: '',
-    gestureFallbackTapEnabled: false
+    gestureFallbackTapEnabled: false,
+    loginStatus: '微信身份确认中'
   },
 
   onLoad() {
@@ -69,11 +70,15 @@ Page({
     if (this.loginPromise) return this.loginPromise;
     this.loginPromise = login()
       .then((data) => {
-        if (data.quota) this.setData({ quota: data.quota });
+        this.setData({
+          ...(data.quota ? { quota: data.quota } : {}),
+          loginStatus: '微信身份已确认'
+        });
         return data;
       })
       .catch((err) => {
         this.loginPromise = null;
+        this.setData({ loginStatus: '微信身份确认失败' });
         wx.showToast({ title: err.message || '登录失败，请稍后重试', icon: 'none' });
         throw err;
       });

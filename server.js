@@ -454,13 +454,28 @@ function readBody(req, limit = 18 * 1024 * 1024) {
   });
 }
 
+async function fetchWithTimeout(url, options = {}, timeoutMs = 30000, label = '外部请求') {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      throw new Error(`${label}超时（${Math.round(timeoutMs / 1000)} 秒）。`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function imageInputToDataUrl(input) {
   const value = String(input || '').trim();
   if (!value) throw new Error('缺少图片。');
   if (value.startsWith('data:image/')) return value;
   if (!/^https?:\/\//i.test(value)) throw new Error('图片地址格式无效。');
 
-  const response = await fetch(value);
+  const response = await fetchWithTimeout(value, {}, Number(process.env.IMAGE_DOWNLOAD_TIMEOUT_MS || 8000), '下载小程序图片');
   if (!response.ok) {
     throw new Error(`下载小程序图片失败：HTTP ${response.status}`);
   }
@@ -557,7 +572,8 @@ async function quotaPool() {
       port: mysqlPort,
       user: process.env.MYSQL_USERNAME,
       password: process.env.MYSQL_PASSWORD,
-      charset: 'utf8mb4'
+      charset: 'utf8mb4',
+      connectTimeout: Number(process.env.MYSQL_CONNECT_TIMEOUT_MS || 1800)
     };
     const connection = await mysql.createConnection(baseConfig);
     try {
@@ -572,6 +588,7 @@ async function quotaPool() {
       waitForConnections: true,
       connectionLimit: Number(process.env.MYSQL_CONNECTION_LIMIT || 4),
       maxIdle: Number(process.env.MYSQL_CONNECTION_LIMIT || 4),
+      connectTimeout: Number(process.env.MYSQL_CONNECT_TIMEOUT_MS || 1800),
       idleTimeout: 60000
     });
     await pool.query(`
@@ -1094,14 +1111,14 @@ async function createArkRecommendation(imageDataUrl, metrics, count = 5) {
       ]
     }]
   };
-  const response = await fetch(`${arkApiBase}/responses`, {
+  const response = await fetchWithTimeout(`${arkApiBase}/responses`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${process.env.ARK_API_KEY}`
     },
     body: JSON.stringify(requestPayload)
-  });
+  }, Number(process.env.ANALYSIS_TIMEOUT_MS || 15000), '火山方舟推荐');
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
     throw new Error(payload.error?.message || payload.message || payload.msg || `火山方舟推荐失败：HTTP ${response.status}`);
@@ -1775,7 +1792,7 @@ async function createSeedreamStyleVariant(imageDataUrl, style) {
     throw new Error('缺少 ARK_API_KEY。请在云托管环境变量中配置火山方舟 API Key。');
   }
 
-  const response = await fetch(`${arkApiBase}/images/generations`, {
+  const response = await fetchWithTimeout(`${arkApiBase}/images/generations`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -1790,7 +1807,7 @@ async function createSeedreamStyleVariant(imageDataUrl, style) {
       watermark: false,
       sequential_image_generation: 'disabled'
     })
-  });
+  }, Number(process.env.IMAGE_GENERATION_TIMEOUT_MS || 180000), `${style.label} Seedream 生图`);
 
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {

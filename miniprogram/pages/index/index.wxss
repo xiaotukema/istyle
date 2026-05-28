@@ -70,6 +70,7 @@
   font-weight: 800;
 }
 
+.login-status,
 .quota,
 .analysis {
   margin-top: 8rpx;
