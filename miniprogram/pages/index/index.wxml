@@ -1,5 +1,14 @@
 <view class="page">
-  <camera class="camera {{currentImage ? 'camera-pip' : ''}}" device-position="front" flash="off" binderror="onCameraError"></camera>
+  <camera
+    class="camera {{currentImage ? 'camera-pip' : ''}}"
+    device-position="front"
+    flash="off"
+    frame-size="small"
+    bindinitdone="onCameraReady"
+    binderror="onCameraError"
+  ></camera>
+
+  <view class="snap-flash {{snapFlash ? 'show' : ''}}"></view>
 
   <view class="panel {{currentImage ? 'panel-compact' : ''}}">
     <view class="title">实时发型试戴</view>
@@ -7,6 +16,7 @@
     <view class="analysis" wx:if="{{analysis.summary}}">
       <view>{{analysis.summary}}</view>
     </view>
+    <view class="gesture-hint" wx:if="{{gestureHint}}">{{gestureHint}}</view>
   </view>
 
   <view class="tryon" wx:if="{{currentImage}}">
@@ -28,10 +38,10 @@
     <button
       wx:for="{{styles}}"
       wx:key="id"
-      class="style {{index === currentIndex ? 'active' : ''}}"
+      class="style {{index === currentIndex ? 'active' : ''}} {{!item.tryonImage && !item.tryonError ? 'pending' : ''}}"
       bindtap="selectStyle"
       data-index="{{index}}"
-    >{{item.rank}}. {{item.label}}{{item.tryonImage ? ' ✓' : ''}}</button>
+    >{{item.rank}}. {{item.label}}{{item.tryonImage ? ' ✓' : ''}}{{!item.tryonImage && !item.tryonError ? ' · 生成中' : ''}}</button>
   </scroll-view>
 
   <view class="dock">
