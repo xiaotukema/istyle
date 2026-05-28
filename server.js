@@ -73,8 +73,10 @@ const enableDevQuotaReset = process.env.ENABLE_DEV_QUOTA_RESET === 'true';
 const authSessions = new Map();
 const quotaByUserDay = new Map();
 let quotaPoolPromise = null;
+const hairRecommendationJobs = new Map();
 const hairTryOnJobs = new Map();
 const hairTryOnHistory = [];
+const hairRecommendationJobTtlMs = 20 * 60 * 1000;
 const hairTryOnJobTtlMs = 45 * 60 * 1000;
 const hairTryOnHistoryLimit = 80;
 
@@ -684,11 +686,29 @@ async function resetQuota(userId) {
   return quotaState(userId);
 }
 
+function pruneHairRecommendationJobs() {
+  const now = Date.now();
+  for (const [id, job] of hairRecommendationJobs) {
+    if (now - job.createdAt > hairRecommendationJobTtlMs) hairRecommendationJobs.delete(id);
+  }
+}
+
 function pruneHairTryOnJobs() {
   const now = Date.now();
   for (const [id, job] of hairTryOnJobs) {
     if (now - job.createdAt > hairTryOnJobTtlMs) hairTryOnJobs.delete(id);
   }
+}
+
+function visibleHairRecommendationJob(job) {
+  return {
+    jobId: job.id,
+    status: job.status,
+    result: job.result,
+    error: job.error,
+    createdAt: job.createdAt,
+    updatedAt: job.updatedAt
+  };
 }
 
 function visibleHairTryOnJob(job) {
@@ -1098,7 +1118,7 @@ async function createGeminiRecommendation(imageDataUrl, metrics, count = 5) {
   return JSON.parse(stripJsonFence(text));
 }
 
-async function createArkRecommendation(imageDataUrl, metrics, count = 5) {
+async function createArkRecommendation(imageDataUrl, metrics, count = 5, options = {}) {
   if (!process.env.ARK_API_KEY) throw new Error('缺少 ARK_API_KEY。');
   const imageUrl = dataUrlToArkImageUrl(imageDataUrl);
   const requestPayload = {
@@ -1118,7 +1138,7 @@ async function createArkRecommendation(imageDataUrl, metrics, count = 5) {
       Authorization: `Bearer ${process.env.ARK_API_KEY}`
     },
     body: JSON.stringify(requestPayload)
-  }, Number(process.env.ANALYSIS_TIMEOUT_MS || 15000), '火山方舟推荐');
+  }, Number(options.timeoutMs || process.env.ANALYSIS_TIMEOUT_MS || 15000), '火山方舟推荐');
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
     throw new Error(payload.error?.message || payload.message || payload.msg || `火山方舟推荐失败：HTTP ${response.status}`);
@@ -1169,7 +1189,7 @@ async function createHairRecommendation(imageDataUrl, metrics = {}, options = {}
     const aiPayload = analysisProvider === 'openai'
       ? await createOpenAiRecommendation(imageDataUrl, metrics, count)
       : analysisProvider === 'ark'
-        ? await createArkRecommendation(imageDataUrl, metrics, count)
+        ? await createArkRecommendation(imageDataUrl, metrics, count, { timeoutMs: options.analysisTimeoutMs })
         : await createGeminiRecommendation(imageDataUrl, metrics, count);
     return normalizeRecommendation({ ...aiPayload, provider: analysisProvider }, fallback, count);
   } catch (err) {
@@ -1982,6 +2002,64 @@ const server = createServer(async (req, res) => {
         : await imageInputToDataUrl(inputImage);
       const result = await createHairRecommendation(image, payload.metrics || {}, { count: payload.count });
       json(res, 200, result);
+      return;
+    }
+
+    if (req.method === 'POST' && requestUrl.pathname === '/api/hair-recommendation-job') {
+      pruneHairRecommendationJobs();
+      const body = await readBody(req);
+      const payload = JSON.parse(body || '{}');
+      const user = requireUser(req);
+      const inputImage = payload.image || payload.imageUrl;
+      const image = analysisProvider === 'ark' && /^https?:\/\//i.test(String(inputImage || ''))
+        ? inputImage
+        : await imageInputToDataUrl(inputImage);
+      const jobId = crypto.randomUUID();
+      const job = {
+        id: jobId,
+        owner: user.openid,
+        status: 'running',
+        result: null,
+        error: '',
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      };
+      hairRecommendationJobs.set(jobId, job);
+      console.log(`[hair-recommendation-job:${jobId.slice(0, 8)}] provider=${analysisProvider} count=${payload.count || 5} user=${user.source}`);
+      json(res, 202, visibleHairRecommendationJob(job));
+
+      Promise.resolve().then(async () => {
+        const result = await createHairRecommendation(image, payload.metrics || {}, {
+          count: payload.count,
+          analysisTimeoutMs: Number(process.env.ANALYSIS_JOB_TIMEOUT_MS || 60000)
+        });
+        job.status = 'done';
+        job.result = result;
+        job.updatedAt = Date.now();
+        console.log(`[hair-recommendation-job:${jobId.slice(0, 8)}] done provider=${result.provider}`);
+      }).catch((err) => {
+        job.status = 'failed';
+        job.error = err.message || String(err);
+        job.updatedAt = Date.now();
+        console.error(`[hair-recommendation-job:${jobId.slice(0, 8)}] failed: ${err.stack || err.message || String(err)}`);
+      });
+      return;
+    }
+
+    if (req.method === 'GET' && requestUrl.pathname === '/api/hair-recommendation-job') {
+      pruneHairRecommendationJobs();
+      const jobId = requestUrl.searchParams.get('id') || '';
+      const job = hairRecommendationJobs.get(jobId);
+      const user = requireUser(req);
+      if (!job) {
+        json(res, 404, { error: '推荐任务不存在或已过期' });
+        return;
+      }
+      if (job.owner && user.openid !== job.owner) {
+        json(res, 403, { error: '无权查看该推荐任务' });
+        return;
+      }
+      json(res, 200, visibleHairRecommendationJob(job));
       return;
     }
 

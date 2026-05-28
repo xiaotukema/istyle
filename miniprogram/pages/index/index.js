@@ -5,6 +5,8 @@ const MORE_COUNT = 3;
 const TOTAL_COUNT = 11;
 const TRYON_POLL_INTERVAL = 2000;
 const TRYON_POLL_LIMIT = 120;
+const RECOMMENDATION_POLL_INTERVAL = 2000;
+const RECOMMENDATION_POLL_LIMIT = 45;
 const HAND_DETECT_INTERVAL = 180;
 const SNAP_COOLDOWN = 950;
 const PINCH_CLOSE_RATIO = 0.46;
@@ -432,10 +434,11 @@ Page({
       await this.ensureLogin();
       this.setData({ loading: true, loadingText: '正在分析并生成 5 款发型' });
       const image = await this.captureFrame();
-      const rec = await request('/api/hair-recommendation', {
+      const recommendationJob = await request('/api/hair-recommendation-job', {
         method: 'POST',
         data: { image, metrics: {}, count: TOTAL_COUNT }
       });
+      const rec = await this.waitForRecommendationJob(recommendationJob.jobId);
       const recommendations = (rec.recommendations || []).slice(0, TOTAL_COUNT);
       const first = recommendations.slice(0, INITIAL_COUNT).map((item, index) => ({ ...item, rank: index + 1 }));
       this.setData({
@@ -454,6 +457,20 @@ Page({
     } finally {
       this.setData({ loading: false });
     }
+  },
+
+  async waitForRecommendationJob(jobId) {
+    if (!jobId) throw new Error('推荐任务创建失败');
+    for (let attempt = 0; attempt < RECOMMENDATION_POLL_LIMIT; attempt += 1) {
+      await delay(RECOMMENDATION_POLL_INTERVAL);
+      this.setData({
+        loadingText: `正在分析脸型与发质（约 ${Math.max(2, (attempt + 1) * 2)} 秒）`
+      });
+      const job = await request(`/api/hair-recommendation-job?id=${encodeURIComponent(jobId)}`);
+      if (job.status === 'done') return job.result || {};
+      if (job.status === 'failed') throw new Error(job.error || '推荐生成失败');
+    }
+    throw new Error('推荐生成超时，请稍后重试');
   },
 
   async generateTryOns(styles) {
