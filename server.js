@@ -69,6 +69,8 @@ const variantLimit = Number(process.env.HAIR_VARIANT_LIMIT || (imageProvider ===
 const variantConcurrency = Number(process.env.HAIR_VARIANT_CONCURRENCY || (imageProvider === 'liblib' ? 1 : 3));
 const tryOnLimit = Number(process.env.HAIR_TRYON_LIMIT || 5);
 const dailyHairLimit = Number(process.env.DAILY_HAIR_LIMIT || 11);
+const recommendationSyncTimeoutMs = Math.max(18000, positiveNumber(process.env.ANALYSIS_SYNC_TIMEOUT_MS, 22000));
+const recommendationJobTimeoutMs = Math.max(recommendationSyncTimeoutMs, positiveNumber(process.env.ANALYSIS_JOB_TIMEOUT_MS, 45000));
 const enableDevQuotaReset = process.env.ENABLE_DEV_QUOTA_RESET === 'true';
 const authSessions = new Map();
 const quotaByUserDay = new Map();
@@ -82,6 +84,11 @@ const hairTryOnHistoryLimit = 80;
 
 function shortText(value, max = 80, fallback = '') {
   return String(value || fallback).trim().replace(/\s+/g, ' ').slice(0, max);
+}
+
+function positiveNumber(value, fallback) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
 function stableIdFromText(text, prefix = 'ai-style') {
@@ -457,13 +464,14 @@ function readBody(req, limit = 18 * 1024 * 1024) {
 }
 
 async function fetchWithTimeout(url, options = {}, timeoutMs = 30000, label = '外部请求') {
+  const safeTimeoutMs = positiveNumber(timeoutMs, 30000);
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const timer = setTimeout(() => controller.abort(), safeTimeoutMs);
   try {
     return await fetch(url, { ...options, signal: controller.signal });
   } catch (err) {
     if (err.name === 'AbortError') {
-      throw new Error(`${label}超时（${Math.round(timeoutMs / 1000)} 秒）。`);
+      throw new Error(`${label}超时（${Math.round(safeTimeoutMs / 1000)} 秒）。`);
     }
     throw err;
   } finally {
@@ -2004,7 +2012,7 @@ const server = createServer(async (req, res) => {
         : await imageInputToDataUrl(inputImage);
       const result = await createHairRecommendation(image, payload.metrics || {}, {
         count: payload.count,
-        analysisTimeoutMs: Number(process.env.ANALYSIS_SYNC_TIMEOUT_MS || 7000)
+        analysisTimeoutMs: recommendationSyncTimeoutMs
       });
       console.log(`[hair-recommendation] done provider=${result.provider} elapsed=${Date.now() - startedAt}ms`);
       json(res, 200, result);
@@ -2037,7 +2045,7 @@ const server = createServer(async (req, res) => {
       Promise.resolve().then(async () => {
         const result = await createHairRecommendation(image, payload.metrics || {}, {
           count: payload.count,
-          analysisTimeoutMs: Number(process.env.ANALYSIS_JOB_TIMEOUT_MS || 60000)
+          analysisTimeoutMs: recommendationJobTimeoutMs
         });
         job.status = 'done';
         job.result = result;
@@ -2225,6 +2233,7 @@ server.listen(port, () => {
   console.log(`Image provider: ${imageProvider}`);
   console.log(`Analysis provider: ${analysisProvider}`);
   console.log(`Analysis model: ${analysisModel}`);
+  console.log(`Recommendation timeout: sync=${recommendationSyncTimeoutMs}ms, job=${recommendationJobTimeoutMs}ms`);
   console.log(`Image model: ${imageProvider === 'seedream' || imageProvider === 'ark' ? arkImageModel : imageProvider === 'liblib' ? liblibModel : imageProvider === 'agnes' ? agnesModel : imageProvider === 'gemini' ? geminiModel : model}`);
   console.log(`Aesthetic analysis provider: ${aestheticAnalysisProvider}`);
   console.log(`Aesthetic analysis model: ${aestheticAnalysisModel}`);

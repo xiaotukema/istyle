@@ -448,7 +448,7 @@ Page({
         remainingCount: TOTAL_COUNT - first.length
       });
       if (rec.provider && /fallback/i.test(rec.provider)) {
-        wx.showToast({ title: rec.warning || 'AI 分析失败，已使用备用推荐', icon: 'none' });
+        console.warn('AI recommendation fallback:', rec.warning || rec.provider);
       }
       await this.generateTryOns(first);
     } catch (err) {
