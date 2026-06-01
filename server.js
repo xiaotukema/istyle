@@ -1992,6 +1992,7 @@ const server = createServer(async (req, res) => {
     }
 
     if (req.method === 'POST' && requestUrl.pathname === '/api/hair-recommendation') {
+      const startedAt = Date.now();
       const body = await readBody(req);
       const payload = JSON.parse(body || '{}');
       const user = requireUser(req);
@@ -2000,7 +2001,11 @@ const server = createServer(async (req, res) => {
       const image = analysisProvider === 'ark' && /^https?:\/\//i.test(String(inputImage || ''))
         ? inputImage
         : await imageInputToDataUrl(inputImage);
-      const result = await createHairRecommendation(image, payload.metrics || {}, { count: payload.count });
+      const result = await createHairRecommendation(image, payload.metrics || {}, {
+        count: payload.count,
+        analysisTimeoutMs: Number(process.env.ANALYSIS_SYNC_TIMEOUT_MS || 7000)
+      });
+      console.log(`[hair-recommendation] done provider=${result.provider} elapsed=${Date.now() - startedAt}ms`);
       json(res, 200, result);
       return;
     }

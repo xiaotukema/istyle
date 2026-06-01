@@ -434,11 +434,10 @@ Page({
       await this.ensureLogin();
       this.setData({ loading: true, loadingText: '正在分析并生成 5 款发型' });
       const image = await this.captureFrame();
-      const recommendationJob = await request('/api/hair-recommendation-job', {
+      const rec = await request('/api/hair-recommendation', {
         method: 'POST',
         data: { image, metrics: {}, count: TOTAL_COUNT }
       });
-      const rec = await this.waitForRecommendationJob(recommendationJob.jobId);
       const recommendations = (rec.recommendations || []).slice(0, TOTAL_COUNT);
       const first = recommendations.slice(0, INITIAL_COUNT).map((item, index) => ({ ...item, rank: index + 1 }));
       this.setData({
