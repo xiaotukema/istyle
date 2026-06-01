@@ -50,7 +50,7 @@ const imageProvider = (process.env.IMAGE_PROVIDER || (process.env.ARK_API_KEY ? 
 const model = process.env.OPENAI_IMAGE_MODEL || 'gpt-image-1.5';
 const geminiModel = process.env.GEMINI_IMAGE_MODEL || 'gemini-3-pro-image-preview';
 const analysisProvider = (process.env.ANALYSIS_PROVIDER || (process.env.ARK_API_KEY ? 'ark' : process.env.GEMINI_API_KEY ? 'gemini' : process.env.OPENAI_API_KEY ? 'openai' : 'local')).toLowerCase();
-const analysisModel = process.env.ANALYSIS_MODEL || (analysisProvider === 'gemini' ? 'gemini-2.5-pro' : analysisProvider === 'ark' ? 'doubao-seed-2-0-pro-260215' : 'gpt-4.1-mini');
+const analysisModel = process.env.ANALYSIS_MODEL || (analysisProvider === 'gemini' ? 'gemini-2.5-pro' : analysisProvider === 'ark' ? 'doubao-seed-2-0-lite-260428' : 'gpt-4.1-mini');
 const aestheticAnalysisProvider = (process.env.AESTHETIC_ANALYSIS_PROVIDER || aestheticConfig.analysisProvider || analysisProvider).toLowerCase();
 const aestheticAnalysisModel = process.env.AESTHETIC_ANALYSIS_MODEL || aestheticConfig.analysisModel || (aestheticAnalysisProvider === 'gemini' ? 'gemini-2.5-pro' : analysisModel);
 const aestheticImageProvider = (process.env.AESTHETIC_IMAGE_PROVIDER || aestheticConfig.imageProvider || 'gemini').toLowerCase();

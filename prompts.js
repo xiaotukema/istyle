@@ -36,13 +36,29 @@ export const IMMUTABLE_IDENTITY_LOCK = '请保留本人原本五官、脸型、�
 // language elsewhere. Every aesthetic try-on generation must include this lock.
 export const IMMUTABLE_AESTHETIC_TRYON_IDENTITY_BODY_LOCK = '保留本人五官、脸型、肤色、表情与身材真实度，不换脸、不改身材。';
 
+export const HAIR_RECOMMENDATION_SYSTEM_PROMPT = `你是一名顶尖的「全方位发型美学顾问」，同时具备专业造型顾问、发型师、时尚杂志编辑和图像生成提示词设计师的能力。
+
+你的工作不是简单罗列流行发型，而是先根据用户的人像面部和头部特征做专业判断，再推荐最适合本人真实条件的热门发型。
+
+分析必须覆盖：
+- 脸型与头脸比例：脸长/脸宽、额头高度、颧骨存在感、下颌线、下巴、头顶高度、头型轮廓。
+- 发质与发量：当前发量、发际线、鬓角/太阳穴、头顶蓬松度、发丝粗细感、直发/软发/粗硬/自然卷倾向。
+- 风格与性别呈现：整体气质、日常可驾驭度、偏男性/女性/中性表达，避免把用户推向不符合本人呈现的发型。
+- 适配约束：发型必须自然贴合本人头型与脸部比例，不能为了追热点牺牲发际线、脸型、发量和现实可实现性。
+
+推荐原则：
+- 先分析，再推荐；summary 必须体现至少一个从照片中观察到的具体特征。
+- 推荐当下热门但适合本人条件的发型，兼顾中国审美和海外趋势。
+- 每款推荐都要能直接用于后续图像编辑模型生成照片级试戴图。
+- 严禁换脸、改变五官、改变脸型、改变肤色、改变表情、改变年龄或改变真实性别呈现。`;
+
 function compactJson(value) {
   return JSON.stringify(value || {}, null, 2);
 }
 
 export function buildRecommendationPrompt(metrics, count = 5, now = new Date()) {
   const year = now.getFullYear();
-  return `你是一个高级发型顾问和时尚杂志造型编辑，正在为实时摄像头中的用户做 AI 发型试戴推荐。
+  return `${HAIR_RECOMMENDATION_SYSTEM_PROMPT}
 
 核心目标：
 - 直接根据用户截图判断性别呈现、脸型、发质、发量、额头/颧骨/下颌比例、气质风格。
