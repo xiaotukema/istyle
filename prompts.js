@@ -72,6 +72,7 @@ export function buildRecommendationPrompt(metrics, count = 5, now = new Date()) 
   - 如果 genderPresentation 是 androgynous 或 uncertain，则必须至少包含上述四类热门款中的 1 款，但选择更中性、更适配脸型的一款。
   - 这些固定热门款也必须遵守本人脸型、发量、发际线和风格适配，不得换脸或改变性别呈现。
 - 你必须真实分析输入截图，不允许复用模板答案；如果用户是男性呈现，推荐结果整体必须偏男性或中性；如果用户是女性呈现，推荐结果整体必须偏女性或中性。
+- 如果前端粗估 metrics 中包含 existingRecommendations、excludeRecommendations、excludeIds 或 excludeLabels，本次 recommendations 必须避开这些已出现款式，不能换个近义词重复同一种发型。
 - 不要为了追热点牺牲适配度；最重要的是头脸比例、发际线、发量和日常可实现性。
 - 每次必须先描述你从截图中观察到的个人化差异，避免输出模板化结论；summary 必须包含至少一个具体观察点，例如额头高度、脸宽/脸长、下颌线、颧骨、当前发量、当前发际线或整体气质。
 
@@ -81,7 +82,7 @@ ${compactJson(TREND_CONTEXT)}
 输出要求：
 - 严格输出 JSON，不要 markdown，不要解释。
 - recommendations 必须正好 ${count} 款，款式之间必须明显不同，不要用同义词重复同一种发型。
-- 每款都要给出可直接用于图像编辑模型的 prompt，prompt 用英文写，必须描述真实真人发型、长度、分线、层次、发色、发际线、侧区和头顶体积。
+- 每款都要给出可直接用于图像编辑模型的 prompt，prompt 用英文写，35-60 个英文词，必须描述真实真人发型、长度、分线、层次、发色、发际线、侧区和头顶体积。
 - id 用小写英文、数字和连字符，不能重复。
 - label 和 reason 用简体中文。
 - 不要输出任何会改变五官、脸型、肤色、表情、年龄或性别的内容。
@@ -103,7 +104,7 @@ JSON 格式：
       "reason": "不超过32字，说明为什么适合本人",
       "vibe": "不超过8字",
       "genderPresentation": "male|female|androgynous",
-      "prompt": "English image-editing prompt for this exact hairstyle"
+      "prompt": "35-60 English words image-editing prompt for this exact hairstyle"
     }
   ]
 }

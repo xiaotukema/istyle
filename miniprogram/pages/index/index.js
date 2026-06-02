@@ -436,14 +436,13 @@ Page({
       const image = await this.captureFrame();
       const recommendationJob = await request('/api/hair-recommendation-job', {
         method: 'POST',
-        data: { image, metrics: {}, count: TOTAL_COUNT }
+        data: { image, metrics: {}, count: INITIAL_COUNT }
       });
       const rec = await this.waitForRecommendationJob(recommendationJob.jobId);
-      const recommendations = (rec.recommendations || []).slice(0, TOTAL_COUNT);
-      const first = recommendations.slice(0, INITIAL_COUNT).map((item, index) => ({ ...item, rank: index + 1 }));
+      const first = (rec.recommendations || []).slice(0, INITIAL_COUNT).map((item, index) => ({ ...item, rank: index + 1 }));
       this.setData({
         image,
-        recommendations,
+        recommendations: first,
         styles: first,
         analysis: rec.analysis || {},
         remainingCount: TOTAL_COUNT - first.length
@@ -567,18 +566,47 @@ Page({
       return;
     }
     const start = this.data.styles.length;
-    const batch = this.data.recommendations
-      .slice(start, start + Math.min(MORE_COUNT, this.data.remainingCount))
-      .map((item, index) => ({ ...item, rank: start + index + 1 }));
-    if (!batch.length) {
-      wx.showToast({ title: '您的今日生成次数已达上限，请明天再来试试吧', icon: 'none' });
-      return;
-    }
+    const desiredCount = Math.min(MORE_COUNT, this.data.remainingCount);
     this.setData({
-      styles: this.data.styles.concat(batch),
-      remainingCount: Math.max(0, TOTAL_COUNT - start - batch.length)
+      loading: true,
+      loadingText: `正在补充 ${desiredCount} 款新发型`
     });
     try {
+      const existingRecommendations = this.data.styles.map((item) => ({
+        id: item.id,
+        label: item.label
+      }));
+      const recommendationJob = await request('/api/hair-recommendation-job', {
+        method: 'POST',
+        data: {
+          image: this.data.image,
+          metrics: { existingRecommendations },
+          count: desiredCount
+        }
+      });
+      const rec = await this.waitForRecommendationJob(recommendationJob.jobId);
+      if (rec.provider && /fallback/i.test(rec.provider)) {
+        console.warn('AI recommendation fallback:', rec.warning || rec.provider);
+      }
+      const existingIds = new Set(this.data.styles.map((item) => String(item.id || '').toLowerCase()));
+      const existingLabels = new Set(this.data.styles.map((item) => String(item.label || '').toLowerCase()));
+      const batch = (rec.recommendations || [])
+        .filter((item) => {
+          const id = String(item.id || '').toLowerCase();
+          const label = String(item.label || '').toLowerCase();
+          return (!id || !existingIds.has(id)) && (!label || !existingLabels.has(label));
+        })
+        .slice(0, desiredCount)
+        .map((item, index) => ({ ...item, rank: start + index + 1 }));
+      if (!batch.length) {
+        wx.showToast({ title: '暂时没有新的合适发型，请稍后再试', icon: 'none' });
+        return;
+      }
+      this.setData({
+        recommendations: this.data.recommendations.concat(batch),
+        styles: this.data.styles.concat(batch),
+        remainingCount: Math.max(0, TOTAL_COUNT - start - batch.length)
+      });
       await this.generateTryOns(batch);
     } catch (err) {
       wx.showToast({ title: err.message || '生成失败', icon: 'none' });

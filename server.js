@@ -480,9 +480,13 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 30000, label = '�
 }
 
 async function imageInputToDataUrl(input) {
+  const startedAt = Date.now();
   const value = String(input || '').trim();
   if (!value) throw new Error('缺少图片。');
-  if (value.startsWith('data:image/')) return value;
+  if (value.startsWith('data:image/')) {
+    console.log(`[image-input] using inline image bytes=${Math.round(value.length / 1024)}KB`);
+    return value;
+  }
   if (!/^https?:\/\//i.test(value)) throw new Error('图片地址格式无效。');
 
   const response = await fetchWithTimeout(value, {}, Number(process.env.IMAGE_DOWNLOAD_TIMEOUT_MS || 8000), '下载小程序图片');
@@ -497,6 +501,7 @@ async function imageInputToDataUrl(input) {
   if (buffer.length > 12 * 1024 * 1024) {
     throw new Error('小程序图片过大，请重新拍摄。');
   }
+  console.log(`[image-input] downloaded image type=${mimeType} bytes=${Math.round(buffer.length / 1024)}KB elapsed=${Date.now() - startedAt}ms`);
   return `data:${mimeType.replace('image/jpg', 'image/jpeg')};base64,${buffer.toString('base64')}`;
 }
 
@@ -519,7 +524,6 @@ function dataUrlToBlob(dataUrl) {
 }
 
 function dataUrlToArkImageUrl(imageDataUrl) {
-  if (/^https?:\/\//i.test(imageDataUrl || '')) return imageDataUrl;
   const input = parseDataUrl(imageDataUrl);
   return `data:${input.mimeType};base64,${input.data}`;
 }
@@ -1061,6 +1065,40 @@ function isGenderCompatible(style, bucket) {
   return true;
 }
 
+function recommendationExclusionSet(metrics = {}) {
+  const rawItems = [
+    ...(Array.isArray(metrics.existingRecommendations) ? metrics.existingRecommendations : []),
+    ...(Array.isArray(metrics.excludeRecommendations) ? metrics.excludeRecommendations : []),
+    ...(Array.isArray(metrics.excludeIds) ? metrics.excludeIds : []),
+    ...(Array.isArray(metrics.excludeLabels) ? metrics.excludeLabels : [])
+  ];
+  const ids = new Set();
+  const labels = new Set();
+  for (const item of rawItems) {
+    if (!item) continue;
+    if (typeof item === 'string') {
+      const value = item.trim().toLowerCase();
+      if (value) {
+        ids.add(value);
+        labels.add(value);
+      }
+      continue;
+    }
+    const id = String(item.id || '').trim().toLowerCase();
+    const label = String(item.label || '').trim().toLowerCase();
+    if (id) ids.add(id);
+    if (label) labels.add(label);
+  }
+  return { ids, labels };
+}
+
+function isExcludedRecommendation(style, exclusion) {
+  if (!style || !exclusion) return false;
+  const id = String(style.id || '').trim().toLowerCase();
+  const label = String(style.label || '').trim().toLowerCase();
+  return (id && exclusion.ids.has(id)) || (label && exclusion.labels.has(label));
+}
+
 function catalogRecommendation(id, rank = 1) {
   const item = recommendationById(id);
   return {
@@ -1071,8 +1109,9 @@ function catalogRecommendation(id, rank = 1) {
   };
 }
 
-function enforceTrendRecommendationRules(items, analysis, fallback, count = 5) {
+function enforceTrendRecommendationRules(items, analysis, fallback, count = 5, metrics = {}) {
   const bucket = recommendationGenderBucket(analysis.genderPresentation);
+  const exclusion = recommendationExclusionSet(metrics);
   const forcedIds = bucket === 'male'
     ? ['male-american-textured-fringe', 'male-soft-wolf-cut']
     : bucket === 'female'
@@ -1090,12 +1129,13 @@ function enforceTrendRecommendationRules(items, analysis, fallback, count = 5) {
   for (const id of forcedIds) {
     const existing = items.find((item) => item.id === id || item.label === recommendationById(id)?.label);
     const style = existing || catalogRecommendation(id);
-    if (style && isGenderCompatible(style, bucket)) result.push(style);
+    if (style && isGenderCompatible(style, bucket) && !isExcludedRecommendation(style, exclusion)) result.push(style);
     if (bucket !== 'male' && bucket !== 'female' && result.length >= 1) break;
   }
 
   for (const item of items) {
     if (result.length >= count) break;
+    if (isExcludedRecommendation(item, exclusion)) continue;
     if (!isGenderCompatible(item, bucket)) continue;
     if (result.some((candidate) => candidate.id === item.id || candidate.label === item.label)) continue;
     result.push(item);
@@ -1105,6 +1145,7 @@ function enforceTrendRecommendationRules(items, analysis, fallback, count = 5) {
     if (result.length >= count) break;
     if (result.some((candidate) => candidate.id === id || candidate.label === recommendationById(id)?.label)) continue;
     const item = catalogRecommendation(id);
+    if (isExcludedRecommendation(item, exclusion)) continue;
     if (item && isGenderCompatible(item, bucket)) result.push(item);
   }
 
@@ -1122,7 +1163,7 @@ function recommendationSummary(analysis, recommendations, warning = '') {
   return shortText(`${prefix}${gender}优先推荐 ${labels}。`, 90);
 }
 
-function normalizeRecommendation(payload, fallback, count = 5) {
+function normalizeRecommendation(payload, fallback, count = 5, metrics = {}) {
   const picked = [];
   for (const item of payload.recommendations || []) {
     const label = shortText(item.label, 24);
@@ -1158,7 +1199,7 @@ function normalizeRecommendation(payload, fallback, count = 5) {
     style: shortText(payload.analysis?.style, 16, fallback.analysis.style || '自然'),
     summary: shortText(payload.analysis?.summary, 90, fallback.analysis.summary || '')
   };
-  const recommendations = enforceTrendRecommendationRules(picked, analysis, fallback, count);
+  const recommendations = enforceTrendRecommendationRules(picked, analysis, fallback, count, metrics);
   const recommendationLabels = recommendations.map((style) => style.label);
   const summaryMentionsMismatch = recommendationCatalog
     .map((style) => style.label)
@@ -1208,13 +1249,17 @@ async function createGeminiRecommendation(imageDataUrl, metrics, count = 5) {
 async function createArkRecommendation(imageDataUrl, metrics, count = 5, options = {}) {
   if (!process.env.ARK_API_KEY) throw new Error('缺少 ARK_API_KEY。');
   const imageUrl = dataUrlToArkImageUrl(imageDataUrl);
+  const textPrompt = `${recommendationPrompt(metrics, count)}\n\n请只输出 JSON，不要输出 Markdown。`;
+  const timeoutMs = positiveNumber(options.timeoutMs || process.env.ANALYSIS_TIMEOUT_MS, 15000);
+  const startedAt = Date.now();
+  console.log(`[hair-recommendation] ark request model=${analysisModel} count=${count} image=data-url bytes=${Math.round(String(imageUrl).length / 1024)}KB promptChars=${textPrompt.length} timeout=${timeoutMs}ms`);
   const requestPayload = {
     model: analysisModel,
     input: [{
       role: 'user',
       content: [
         { type: 'input_image', image_url: imageUrl },
-        { type: 'input_text', text: `${recommendationPrompt(metrics, count)}\n\n请只输出 JSON，不要输出 Markdown。` }
+        { type: 'input_text', text: textPrompt }
       ]
     }]
   };
@@ -1225,7 +1270,8 @@ async function createArkRecommendation(imageDataUrl, metrics, count = 5, options
       Authorization: `Bearer ${process.env.ARK_API_KEY}`
     },
     body: JSON.stringify(requestPayload)
-  }, Number(options.timeoutMs || process.env.ANALYSIS_TIMEOUT_MS || 15000), '火山方舟推荐');
+  }, timeoutMs, '火山方舟推荐');
+  console.log(`[hair-recommendation] ark response status=${response.status} elapsed=${Date.now() - startedAt}ms`);
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
     throw new Error(payload.error?.message || payload.message || payload.msg || `火山方舟推荐失败：HTTP ${response.status}`);
@@ -1270,7 +1316,7 @@ async function createHairRecommendation(imageDataUrl, metrics = {}, options = {}
   const count = Math.max(1, Math.min(15, Number(options.count || 5)));
   const fallback = localHairRecommendation(metrics, count);
   if (analysisProvider === 'local') {
-    return normalizeRecommendation({ ...fallback, provider: 'local' }, fallback, count);
+    return normalizeRecommendation({ ...fallback, provider: 'local' }, fallback, count, metrics);
   }
   try {
     const aiPayload = analysisProvider === 'openai'
@@ -1278,14 +1324,14 @@ async function createHairRecommendation(imageDataUrl, metrics = {}, options = {}
       : analysisProvider === 'ark'
         ? await createArkRecommendation(imageDataUrl, metrics, count, { timeoutMs: options.analysisTimeoutMs })
         : await createGeminiRecommendation(imageDataUrl, metrics, count);
-    return normalizeRecommendation({ ...aiPayload, provider: analysisProvider }, fallback, count);
+    return normalizeRecommendation({ ...aiPayload, provider: analysisProvider }, fallback, count, metrics);
   } catch (err) {
     console.error(`[hair-recommendation] ${analysisProvider} failed: ${err.stack || err.message || String(err)}`);
     return normalizeRecommendation({
       ...fallback,
       provider: `${analysisProvider}-fallback`,
       warning: err.message || String(err)
-    }, fallback, count);
+    }, fallback, count, metrics);
   }
 }
 
@@ -2086,9 +2132,7 @@ const server = createServer(async (req, res) => {
       const user = requireUser(req);
       console.log(`[hair-recommendation] provider=${analysisProvider} count=${payload.count || 5} user=${user.source}`);
       const inputImage = payload.image || payload.imageUrl;
-      const image = analysisProvider === 'ark' && /^https?:\/\//i.test(String(inputImage || ''))
-        ? inputImage
-        : await imageInputToDataUrl(inputImage);
+      const image = await imageInputToDataUrl(inputImage);
       const result = await createHairRecommendation(image, payload.metrics || {}, {
         count: payload.count,
         analysisTimeoutMs: recommendationSyncTimeoutMs
@@ -2118,10 +2162,9 @@ const server = createServer(async (req, res) => {
       json(res, 202, visibleHairRecommendationJob(job));
 
       Promise.resolve().then(async () => {
+        const startedAt = Date.now();
         const inputImage = payload.image || payload.imageUrl;
-        const image = analysisProvider === 'ark' && /^https?:\/\//i.test(String(inputImage || ''))
-          ? inputImage
-          : await imageInputToDataUrl(inputImage);
+        const image = await imageInputToDataUrl(inputImage);
         const result = await createHairRecommendation(image, payload.metrics || {}, {
           count: payload.count,
           analysisTimeoutMs: recommendationJobTimeoutMs
@@ -2130,7 +2173,7 @@ const server = createServer(async (req, res) => {
         job.result = result;
         job.updatedAt = Date.now();
         await saveHairRecommendationJob(job);
-        console.log(`[hair-recommendation-job:${jobId.slice(0, 8)}] done provider=${result.provider}`);
+        console.log(`[hair-recommendation-job:${jobId.slice(0, 8)}] done provider=${result.provider} elapsed=${Date.now() - startedAt}ms`);
       }).catch((err) => {
         job.status = 'failed';
         job.error = err.message || String(err);
