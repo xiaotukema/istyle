@@ -2228,9 +2228,7 @@ const server = createServer(async (req, res) => {
       console.log(`[hair-tryon] provider=${imageProvider} requested=${requested} styles=${labels || '-'}`);
       await consumeQuota(user.openid, requested);
       const inputImage = payload.image || payload.imageUrl;
-      const image = (imageProvider === 'seedream' || imageProvider === 'ark') && /^https?:\/\//i.test(String(inputImage || ''))
-        ? inputImage
-        : await imageInputToDataUrl(inputImage);
+      const image = await imageInputToDataUrl(inputImage);
       const result = await createRecommendedTryOns(image, payload.recommendations || [], { limit: payload.limit });
       result.quota = await quotaState(user.openid);
       recordHairTryOnResult({ owner: user?.openid || '', mode: 'sync', result });
@@ -2248,9 +2246,7 @@ const server = createServer(async (req, res) => {
       console.log(`[hair-tryon-job] provider=${imageProvider} requested=${requested} styles=${labels || '-'}`);
       const quota = await consumeQuota(user.openid, requested);
       const inputImage = payload.image || payload.imageUrl;
-      const image = (imageProvider === 'seedream' || imageProvider === 'ark') && /^https?:\/\//i.test(String(inputImage || ''))
-        ? inputImage
-        : await imageInputToDataUrl(inputImage);
+      const image = await imageInputToDataUrl(inputImage);
       const jobId = crypto.randomUUID();
       const owner = user.openid;
       const job = {
