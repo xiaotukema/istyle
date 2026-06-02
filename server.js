@@ -611,6 +611,20 @@ async function quotaPool() {
         PRIMARY KEY (openid, usage_date)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS hair_recommendation_jobs (
+        job_id VARCHAR(64) NOT NULL,
+        owner VARCHAR(128) NOT NULL,
+        status VARCHAR(20) NOT NULL,
+        result_json LONGTEXT NULL,
+        error_text TEXT NULL,
+        created_at BIGINT NOT NULL,
+        updated_at BIGINT NOT NULL,
+        PRIMARY KEY (job_id),
+        KEY idx_owner_created_at (owner, created_at),
+        KEY idx_created_at (created_at)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    `);
     console.log(`Quota store: mysql://${host}:${mysqlPort}/${database}`);
     return pool;
   })().catch((err) => {
@@ -694,10 +708,75 @@ async function resetQuota(userId) {
   return quotaState(userId);
 }
 
-function pruneHairRecommendationJobs() {
+function dbRowToHairRecommendationJob(row) {
+  if (!row) return null;
+  let result = null;
+  if (row.result_json) {
+    try {
+      result = JSON.parse(row.result_json);
+    } catch (err) {
+      result = null;
+    }
+  }
+  return {
+    id: row.job_id,
+    owner: row.owner,
+    status: row.status,
+    result,
+    error: row.error_text || '',
+    createdAt: Number(row.created_at || 0),
+    updatedAt: Number(row.updated_at || 0)
+  };
+}
+
+async function saveHairRecommendationJob(job) {
+  const pool = await quotaPool();
+  if (pool) {
+    await pool.execute(
+      `INSERT INTO hair_recommendation_jobs
+        (job_id, owner, status, result_json, error_text, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+        owner = VALUES(owner),
+        status = VALUES(status),
+        result_json = VALUES(result_json),
+        error_text = VALUES(error_text),
+        updated_at = VALUES(updated_at)`,
+      [
+        job.id,
+        job.owner || '',
+        job.status || 'running',
+        job.result ? JSON.stringify(job.result) : null,
+        job.error || null,
+        job.createdAt || Date.now(),
+        job.updatedAt || Date.now()
+      ]
+    );
+    return;
+  }
+  hairRecommendationJobs.set(job.id, job);
+}
+
+async function loadHairRecommendationJob(jobId) {
+  const pool = await quotaPool();
+  if (pool) {
+    const [rows] = await pool.execute(
+      'SELECT job_id, owner, status, result_json, error_text, created_at, updated_at FROM hair_recommendation_jobs WHERE job_id = ? LIMIT 1',
+      [jobId]
+    );
+    return dbRowToHairRecommendationJob(rows[0]);
+  }
+  return hairRecommendationJobs.get(jobId) || null;
+}
+
+async function pruneHairRecommendationJobs() {
   const now = Date.now();
   for (const [id, job] of hairRecommendationJobs) {
     if (now - job.createdAt > hairRecommendationJobTtlMs) hairRecommendationJobs.delete(id);
+  }
+  const pool = await quotaPool();
+  if (pool) {
+    await pool.execute('DELETE FROM hair_recommendation_jobs WHERE created_at < ?', [now - hairRecommendationJobTtlMs]);
   }
 }
 
@@ -2020,14 +2099,10 @@ const server = createServer(async (req, res) => {
     }
 
     if (req.method === 'POST' && requestUrl.pathname === '/api/hair-recommendation-job') {
-      pruneHairRecommendationJobs();
+      await pruneHairRecommendationJobs();
       const body = await readBody(req);
       const payload = JSON.parse(body || '{}');
       const user = requireUser(req);
-      const inputImage = payload.image || payload.imageUrl;
-      const image = analysisProvider === 'ark' && /^https?:\/\//i.test(String(inputImage || ''))
-        ? inputImage
-        : await imageInputToDataUrl(inputImage);
       const jobId = crypto.randomUUID();
       const job = {
         id: jobId,
@@ -2038,11 +2113,15 @@ const server = createServer(async (req, res) => {
         createdAt: Date.now(),
         updatedAt: Date.now()
       };
-      hairRecommendationJobs.set(jobId, job);
+      await saveHairRecommendationJob(job);
       console.log(`[hair-recommendation-job:${jobId.slice(0, 8)}] provider=${analysisProvider} count=${payload.count || 5} user=${user.source}`);
       json(res, 202, visibleHairRecommendationJob(job));
 
       Promise.resolve().then(async () => {
+        const inputImage = payload.image || payload.imageUrl;
+        const image = analysisProvider === 'ark' && /^https?:\/\//i.test(String(inputImage || ''))
+          ? inputImage
+          : await imageInputToDataUrl(inputImage);
         const result = await createHairRecommendation(image, payload.metrics || {}, {
           count: payload.count,
           analysisTimeoutMs: recommendationJobTimeoutMs
@@ -2050,20 +2129,24 @@ const server = createServer(async (req, res) => {
         job.status = 'done';
         job.result = result;
         job.updatedAt = Date.now();
+        await saveHairRecommendationJob(job);
         console.log(`[hair-recommendation-job:${jobId.slice(0, 8)}] done provider=${result.provider}`);
       }).catch((err) => {
         job.status = 'failed';
         job.error = err.message || String(err);
         job.updatedAt = Date.now();
+        Promise.resolve(saveHairRecommendationJob(job)).catch((saveErr) => {
+          console.error(`[hair-recommendation-job:${jobId.slice(0, 8)}] save failed: ${saveErr.stack || saveErr.message || String(saveErr)}`);
+        });
         console.error(`[hair-recommendation-job:${jobId.slice(0, 8)}] failed: ${err.stack || err.message || String(err)}`);
       });
       return;
     }
 
     if (req.method === 'GET' && requestUrl.pathname === '/api/hair-recommendation-job') {
-      pruneHairRecommendationJobs();
+      await pruneHairRecommendationJobs();
       const jobId = requestUrl.searchParams.get('id') || '';
-      const job = hairRecommendationJobs.get(jobId);
+      const job = await loadHairRecommendationJob(jobId);
       const user = requireUser(req);
       if (!job) {
         json(res, 404, { error: '推荐任务不存在或已过期' });

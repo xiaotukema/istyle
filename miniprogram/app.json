@@ -2,6 +2,7 @@
   "pages": [
     "pages/index/index"
   ],
+  "lazyCodeLoading": "requiredComponents",
   "window": {
     "navigationBarTitleText": "iStyle 发型试戴",
     "navigationBarBackgroundColor": "#0a0c0f",
