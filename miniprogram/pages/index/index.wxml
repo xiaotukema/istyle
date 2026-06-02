@@ -48,7 +48,7 @@
   <view class="dock">
     <button class="primary" bindtap="startRecommend" wx:if="{{!styles.length}}" loading="{{loading}}">开始 AI 推荐</button>
     <button class="primary {{quota.remaining <= 0 || !remainingCount ? 'disabled' : ''}}" bindtap="recommendMore" wx:if="{{styles.length}}" loading="{{loading}}">{{remainingCount ? '推荐更多' : '今日已达上限'}}</button>
-    <button class="secondary" bindtap="resetQuota" wx:if="{{quota.remaining <= 0}}">重置测试次数</button>
+    <button class="secondary" bindtap="resetQuota" wx:if="{{showDevReset && quota.remaining <= 0}}">重置测试次数</button>
     <button class="secondary" bindtap="saveImage" wx:if="{{currentImage}}">保存截图</button>
   </view>
 </view>

@@ -61,7 +61,8 @@ Page({
     snapFlash: false,
     gestureHint: '',
     gestureFallbackTapEnabled: false,
-    loginStatus: '微信身份确认中'
+    loginStatus: '微信身份确认中',
+    showDevReset: false
   },
 
   onLoad() {
