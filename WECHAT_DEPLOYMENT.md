@@ -14,9 +14,9 @@ ARK_API_KEY=...
 ARK_API_BASE=https://ark.cn-beijing.volces.com/api/v3
 IMAGE_PROVIDER=seedream
 ANALYSIS_PROVIDER=ark
-ARK_IMAGE_MODEL=doubao-seedream-5-0-260128
+ARK_IMAGE_MODEL=doubao-seedream-5-5-261028
 ARK_IMAGE_SIZE=2K
-ANALYSIS_MODEL=doubao-seed-2-0-lite-260428
+ANALYSIS_MODEL=deepseek-v4-1-flash-261017
 ANALYSIS_SYNC_TIMEOUT_MS=22000
 ANALYSIS_JOB_TIMEOUT_MS=45000
 DAILY_HAIR_LIMIT=11
@@ -24,6 +24,13 @@ HAIR_VARIANT_CONCURRENCY=1
 ENABLE_DEV_QUOTA_RESET=false
 MYSQL_DATABASE=istyle
 ```
+
+Both models share `ARK_API_BASE`. The server calls `/responses` for DeepSeek
+photo analysis and `/images/generations` for Seedream photo editing. Set the
+base to `https://ark.cn-beijing.volces.com/api/v3` without either endpoint.
+Environment variables override the defaults in `server.js`, so update any old
+`ANALYSIS_MODEL` and `ARK_IMAGE_MODEL` values in the CloudBase Run service when
+deploying a new revision. Confirm both model IDs are enabled in Ark.
 
 When running through CloudBase Run, the backend reads the WeChat openid from
 the cloud container request header. `WX_APPID` and `WX_APP_SECRET` are only

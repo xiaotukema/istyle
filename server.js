@@ -50,7 +50,7 @@ const imageProvider = (process.env.IMAGE_PROVIDER || (process.env.ARK_API_KEY ? 
 const model = process.env.OPENAI_IMAGE_MODEL || 'gpt-image-1.5';
 const geminiModel = process.env.GEMINI_IMAGE_MODEL || 'gemini-3-pro-image-preview';
 const analysisProvider = (process.env.ANALYSIS_PROVIDER || (process.env.ARK_API_KEY ? 'ark' : process.env.GEMINI_API_KEY ? 'gemini' : process.env.OPENAI_API_KEY ? 'openai' : 'local')).toLowerCase();
-const analysisModel = process.env.ANALYSIS_MODEL || (analysisProvider === 'gemini' ? 'gemini-2.5-pro' : analysisProvider === 'ark' ? 'doubao-seed-2-0-lite-260428' : 'gpt-4.1-mini');
+const analysisModel = process.env.ANALYSIS_MODEL || (analysisProvider === 'gemini' ? 'gemini-2.5-pro' : analysisProvider === 'ark' ? 'deepseek-v4-1-flash-261017' : 'gpt-4.1-mini');
 const aestheticAnalysisProvider = (process.env.AESTHETIC_ANALYSIS_PROVIDER || aestheticConfig.analysisProvider || analysisProvider).toLowerCase();
 const aestheticAnalysisModel = process.env.AESTHETIC_ANALYSIS_MODEL || aestheticConfig.analysisModel || (aestheticAnalysisProvider === 'gemini' ? 'gemini-2.5-pro' : analysisModel);
 const aestheticImageProvider = (process.env.AESTHETIC_IMAGE_PROVIDER || aestheticConfig.imageProvider || 'gemini').toLowerCase();
@@ -61,8 +61,8 @@ const agnesModel = process.env.AGNES_IMAGE_MODEL || 'agnes-image-1.2';
 const liblibModel = process.env.LIBLIB_IMAGE_MODEL || 'star-3-alpha';
 const apiBase = process.env.OPENAI_API_BASE || 'https://api.openai.com/v1';
 const geminiApiBase = process.env.GEMINI_API_BASE || 'https://generativelanguage.googleapis.com/v1beta';
-const arkApiBase = process.env.ARK_API_BASE || 'https://ark.cn-beijing.volces.com/api/v3';
-const arkImageModel = process.env.ARK_IMAGE_MODEL || 'doubao-seedream-5-0-260128';
+const arkApiBase = normalizeArkApiBase(process.env.ARK_API_BASE);
+const arkImageModel = process.env.ARK_IMAGE_MODEL || 'doubao-seedream-5-5-261028';
 const agnesApiBase = process.env.AGNES_API_BASE || 'https://apihub.agnes-ai.com/v1';
 const liblibApiBase = process.env.LIBLIB_API_BASE || 'https://openapi.liblibai.cloud';
 const variantLimit = Number(process.env.HAIR_VARIANT_LIMIT || (imageProvider === 'liblib' ? 5 : 15));
@@ -89,6 +89,12 @@ function shortText(value, max = 80, fallback = '') {
 function positiveNumber(value, fallback) {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function normalizeArkApiBase(value) {
+  const base = (String(value || '').trim() || 'https://ark.cn-beijing.volces.com/api/v3').replace(/\/+$/, '');
+  const url = new URL(base);
+  return url.pathname === '/' ? `${base}/api/v3` : base;
 }
 
 function stableIdFromText(text, prefix = 'ai-style') {
@@ -1255,6 +1261,9 @@ async function createArkRecommendation(imageDataUrl, metrics, count = 5, options
   console.log(`[hair-recommendation] ark request model=${analysisModel} count=${count} image=data-url bytes=${Math.round(String(imageUrl).length / 1024)}KB promptChars=${textPrompt.length} timeout=${timeoutMs}ms`);
   const requestPayload = {
     model: analysisModel,
+    stream: false,
+    // Keep interactive hairstyle recommendations within the existing job timeout.
+    ...(/^deepseek-v4-1-flash(?:-|$)/i.test(analysisModel) ? { thinking: { type: 'disabled' } } : {}),
     input: [{
       role: 'user',
       content: [
@@ -1957,9 +1966,12 @@ async function createSeedreamStyleVariant(imageDataUrl, style) {
       image: dataUrlToArkImageUrl(imageDataUrl),
       size: process.env.ARK_IMAGE_SIZE || '2K',
       response_format: 'url',
+      // Hairstyle try-ons are complete portrait photos, including the background.
+      ...(/^doubao-seedream-5-5(?:-|$)/i.test(arkImageModel)
+        ? { output_format: 'png', background: 'opaque' }
+        : { sequential_image_generation: 'disabled' }),
       stream: false,
-      watermark: false,
-      sequential_image_generation: 'disabled'
+      watermark: false
     })
   }, Number(process.env.IMAGE_GENERATION_TIMEOUT_MS || 180000), `${style.label} Seedream 生图`);
 
