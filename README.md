@@ -5,8 +5,8 @@ China-accessible model providers.
 
 ## Features
 
-- Volcengine Ark / Doubao-powered hairstyle analysis.
-- Seedream-powered image try-on.
+- Volcengine Ark / Doubao Seed Evolving-powered hairstyle analysis.
+- Seedream 5.5-powered image try-on.
 - Identity lock prompt: only change hairstyle, preserve the user's face and recognizability.
 - First run generates 5 hairstyles, then two "more recommendations" batches of 3 each.
 - Daily quota control: 11 generated hairstyles per user per day.
@@ -39,6 +39,8 @@ Production requirements:
 - Set `ARK_API_KEY` on the backend.
 - Set `IMAGE_PROVIDER=seedream`.
 - Set `ANALYSIS_PROVIDER=ark`.
+- Set `ARK_API_BASE=https://ark.cn-beijing.volces.com/api/v3` for both models.
+- Set `ARK_IMAGE_MODEL=doubao-seedream-5-5-261028` and `ANALYSIS_MODEL=doubao-seed-evolving`.
 - Keep the CloudBase MySQL `MYSQL_*` variables enabled for persistent quota.
 
 ## Cost Control
