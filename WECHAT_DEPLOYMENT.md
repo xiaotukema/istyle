@@ -16,7 +16,7 @@ IMAGE_PROVIDER=seedream
 ANALYSIS_PROVIDER=ark
 ARK_IMAGE_MODEL=doubao-seedream-5-5-261028
 ARK_IMAGE_SIZE=2K
-ANALYSIS_MODEL=deepseek-v4-1-flash-261017
+ANALYSIS_MODEL=doubao-seed-evolving
 ANALYSIS_SYNC_TIMEOUT_MS=22000
 ANALYSIS_JOB_TIMEOUT_MS=45000
 DAILY_HAIR_LIMIT=11
@@ -25,7 +25,7 @@ ENABLE_DEV_QUOTA_RESET=false
 MYSQL_DATABASE=istyle
 ```
 
-Both models share `ARK_API_BASE`. The server calls `/responses` for DeepSeek
+Both models share `ARK_API_BASE`. The server calls `/responses` for Doubao Seed Evolving
 photo analysis and `/images/generations` for Seedream photo editing. Set the
 base to `https://ark.cn-beijing.volces.com/api/v3` without either endpoint.
 Environment variables override the defaults in `server.js`, so update any old

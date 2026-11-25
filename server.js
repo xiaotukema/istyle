@@ -50,7 +50,7 @@ const imageProvider = (process.env.IMAGE_PROVIDER || (process.env.ARK_API_KEY ? 
 const model = process.env.OPENAI_IMAGE_MODEL || 'gpt-image-1.5';
 const geminiModel = process.env.GEMINI_IMAGE_MODEL || 'gemini-3-pro-image-preview';
 const analysisProvider = (process.env.ANALYSIS_PROVIDER || (process.env.ARK_API_KEY ? 'ark' : process.env.GEMINI_API_KEY ? 'gemini' : process.env.OPENAI_API_KEY ? 'openai' : 'local')).toLowerCase();
-const analysisModel = process.env.ANALYSIS_MODEL || (analysisProvider === 'gemini' ? 'gemini-2.5-pro' : analysisProvider === 'ark' ? 'deepseek-v4-1-flash-261017' : 'gpt-4.1-mini');
+const analysisModel = process.env.ANALYSIS_MODEL || (analysisProvider === 'gemini' ? 'gemini-2.5-pro' : analysisProvider === 'ark' ? 'doubao-seed-evolving' : 'gpt-4.1-mini');
 const aestheticAnalysisProvider = (process.env.AESTHETIC_ANALYSIS_PROVIDER || aestheticConfig.analysisProvider || analysisProvider).toLowerCase();
 const aestheticAnalysisModel = process.env.AESTHETIC_ANALYSIS_MODEL || aestheticConfig.analysisModel || (aestheticAnalysisProvider === 'gemini' ? 'gemini-2.5-pro' : analysisModel);
 const aestheticImageProvider = (process.env.AESTHETIC_IMAGE_PROVIDER || aestheticConfig.imageProvider || 'gemini').toLowerCase();
@@ -1263,7 +1263,7 @@ async function createArkRecommendation(imageDataUrl, metrics, count = 5, options
     model: analysisModel,
     stream: false,
     // Keep interactive hairstyle recommendations within the existing job timeout.
-    ...(/^deepseek-v4-1-flash(?:-|$)/i.test(analysisModel) ? { thinking: { type: 'disabled' } } : {}),
+    ...(analysisModel === 'doubao-seed-evolving' ? { thinking: { type: 'disabled' } } : {}),
     input: [{
       role: 'user',
       content: [
